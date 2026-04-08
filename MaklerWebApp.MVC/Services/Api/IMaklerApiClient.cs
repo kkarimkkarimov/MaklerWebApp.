@@ -6,6 +6,7 @@ public interface IMaklerApiClient
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
     Task<ApiPagedResult<ApiListingSummary>> SearchListingsAsync(ApiListingSearchRequest request, CancellationToken cancellationToken = default);
+    Task<ApiPagedResult<ApiListingSummary>> GetMyListingsAsync(string accessToken, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<ApiListingDetails?> GetListingByIdAsync(int id, CancellationToken cancellationToken = default);
     Task AddListingViewAsync(int id, CancellationToken cancellationToken = default);
     Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default);

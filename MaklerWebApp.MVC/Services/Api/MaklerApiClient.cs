@@ -55,6 +55,26 @@ public class MaklerApiClient : IMaklerApiClient
                ?? new ApiPagedResult<ApiListingSummary>();
     }
 
+    public async Task<ApiPagedResult<ApiListingSummary>> GetMyListingsAsync(string accessToken, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/listings/me?page={page}&pageSize={pageSize}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new ApiPagedResult<ApiListingSummary>();
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(JsonOptions, cancellationToken)
+               ?? new ApiPagedResult<ApiListingSummary>();
+    }
+
     public async Task<ApiListingDetails?> GetListingByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/listings/{id}", cancellationToken);

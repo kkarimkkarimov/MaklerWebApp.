@@ -225,6 +225,23 @@ public class AccountController : Controller
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     }
 
+    private async Task<string?> GetValidAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        if (!string.IsNullOrWhiteSpace(accessToken))
+        {
+            return accessToken;
+        }
+
+        var refreshed = await TryRefreshSessionAsync(cancellationToken);
+        if (!refreshed)
+        {
+            return null;
+        }
+
+        return HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+    }
+
     private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
     {
         var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken);
@@ -241,6 +258,83 @@ public class AccountController : Controller
 
         await SignInAsync(refreshed, isPersistent: true);
         return true;
+    }
+
+    private async Task<T?> ExecuteWithRefreshAsync<T>(
+        Func<string, CancellationToken, Task<T>> operation,
+        string accessToken,
+        CancellationToken cancellationToken) where T : class
+    {
+        try
+        {
+            return await operation(accessToken, cancellationToken);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            var refreshed = await TryRefreshSessionAsync(cancellationToken);
+            if (!refreshed)
+            {
+                return null;
+            }
+
+            var newAccessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+            if (string.IsNullOrWhiteSpace(newAccessToken))
+            {
+                return null;
+            }
+
+            return await operation(newAccessToken, cancellationToken);
+        }
+    }
+
+    private static DashboardListingItemViewModel ToDashboardItem(ApiListingSummary item, string detailsUrl)
+    {
+        return new DashboardListingItemViewModel
+        {
+            Id = item.Id,
+            Title = string.IsNullOrWhiteSpace(item.DisplayTitle) ? "Elan" : item.DisplayTitle,
+            Location = string.IsNullOrWhiteSpace(item.District) ? item.City : $"{item.City}, {item.District}",
+            Price = item.Price,
+            Currency = GetCurrencyCode(item.CurrencyType),
+            StatusLabel = GetStatusLabel(item.Status),
+            StatusClass = GetStatusClass(item.Status),
+            IsFeatured = item.IsFeatured,
+            PublishedAt = item.PublishedAt,
+            DetailsUrl = detailsUrl
+        };
+    }
+
+    private static string GetStatusLabel(int status)
+    {
+        return status switch
+        {
+            1 => "Pending",
+            2 => "Approved",
+            3 => "Rejected",
+            _ => "Unknown"
+        };
+    }
+
+    private static string GetStatusClass(int status)
+    {
+        return status switch
+        {
+            1 => "badge-soft-warning",
+            2 => "badge-soft-success",
+            3 => "badge-soft-danger",
+            _ => "badge-soft-secondary"
+        };
+    }
+
+    private static string GetCurrencyCode(int currencyType)
+    {
+        return currencyType switch
+        {
+            1 => "AZN",
+            2 => "USD",
+            3 => "EUR",
+            _ => "AZN"
+        };
     }
 
     private static IReadOnlyList<Claim> ReadClaims(string jwt)
