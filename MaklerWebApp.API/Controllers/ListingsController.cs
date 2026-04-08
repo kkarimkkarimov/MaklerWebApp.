@@ -182,6 +182,32 @@ public class ListingsController : ControllerBase
         return Ok(new { imageUrls = uploadedUrls });
     }
 
+    [HttpPost("images/upload")]
+    [Authorize]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadImages(List<IFormFile> files, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        if (files.Count == 0)
+        {
+            return BadRequest(new { message = "At least one image file is required." });
+        }
+
+        var uploadedUrls = new List<string>(files.Count);
+        foreach (var file in files)
+        {
+            var imageUrl = await _imageStorageService.SaveAsync(file, "listings", cancellationToken);
+            uploadedUrls.Add(imageUrl);
+        }
+
+        return Ok(new { imageUrls = uploadedUrls });
+    }
+
     [HttpDelete("{listingId:int}/images/{imageId:int}")]
     [Authorize]
     public async Task<IActionResult> DeleteImage(int listingId, int imageId, CancellationToken cancellationToken)

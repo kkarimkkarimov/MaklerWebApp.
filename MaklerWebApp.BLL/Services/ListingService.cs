@@ -2,6 +2,7 @@ using MaklerWebApp.BLL.Models;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Entities;
 using MaklerWebApp.DAL.Enums;
+using MaklerWebApp.DAL.Localization;
 using MaklerWebApp.DAL.Models;
 using MaklerWebApp.DAL.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -139,17 +140,7 @@ public class ListingService : IListingService
                     SortOrder = x.SortOrder
                 })
                 .ToList(),
-            Translations = request.Translations
-                .Where(x => !string.IsNullOrWhiteSpace(x.LanguageCode) && !string.IsNullOrWhiteSpace(x.Title))
-                .GroupBy(x => x.LanguageCode.Trim().ToLowerInvariant())
-                .Select(x => x.First())
-                .Select(x => new ListingTranslation
-                {
-                    LanguageCode = x.LanguageCode.Trim().ToLowerInvariant(),
-                    Title = x.Title.Trim(),
-                    Description = x.Description.Trim()
-                })
-                .ToList()
+            Translations = BuildTranslations(request.Translations)
         };
 
         var created = await _listingRepository.AddAsync(listing, cancellationToken);
@@ -206,17 +197,7 @@ public class ListingService : IListingService
                     SortOrder = x.SortOrder
                 })
                 .ToList(),
-            Translations = request.Translations
-                .Where(x => !string.IsNullOrWhiteSpace(x.LanguageCode) && !string.IsNullOrWhiteSpace(x.Title))
-                .GroupBy(x => x.LanguageCode.Trim().ToLowerInvariant())
-                .Select(x => x.First())
-                .Select(x => new ListingTranslation
-                {
-                    LanguageCode = x.LanguageCode.Trim().ToLowerInvariant(),
-                    Title = x.Title.Trim(),
-                    Description = x.Description.Trim()
-                })
-                .ToList()
+            Translations = BuildTranslations(request.Translations)
         };
 
         return await _listingRepository.UpdateAsync(listing, cancellationToken);
@@ -400,12 +381,24 @@ public class ListingService : IListingService
 
     private static ListingDto MapToDto(Listing listing, string? languageCode)
     {
-        var normalizedLanguageCode = string.IsNullOrWhiteSpace(languageCode)
-            ? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant()
-            : languageCode.Trim().ToLowerInvariant();
+        var requestedLanguageCode = string.IsNullOrWhiteSpace(languageCode)
+            ? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
+            : languageCode;
 
-        var localized = listing.Translations
-            .FirstOrDefault(x => x.LanguageCode.ToLowerInvariant() == normalizedLanguageCode);
+        var normalizedLanguageCode = AppLanguageOptions.NormalizeOrDefault(requestedLanguageCode);
+
+        var normalizedTranslations = listing.Translations
+            .Select(x => new
+            {
+                LanguageCode = AppLanguageOptions.NormalizeOrDefault(x.LanguageCode),
+                Translation = x
+            })
+            .ToList();
+
+        var localized = normalizedTranslations
+            .FirstOrDefault(x => x.LanguageCode == normalizedLanguageCode)?.Translation
+            ?? normalizedTranslations.FirstOrDefault(x => x.LanguageCode == AppLanguageOptions.DefaultLanguage)?.Translation
+            ?? listing.Translations.FirstOrDefault();
 
         return new ListingDto
         {
@@ -460,6 +453,28 @@ public class ListingService : IListingService
                 })
                 .ToList()
         };
+    }
+
+    private static List<ListingTranslation> BuildTranslations(IEnumerable<ListingTranslationInput> translations)
+    {
+        return translations
+            .Where(x => !string.IsNullOrWhiteSpace(x.LanguageCode) && !string.IsNullOrWhiteSpace(x.Title))
+            .Select(x => new
+            {
+                LanguageCode = AppLanguageOptions.NormalizeOrDefault(x.LanguageCode),
+                x.Title,
+                x.Description
+            })
+            .Where(x => AppLanguageOptions.IsSupported(x.LanguageCode))
+            .GroupBy(x => x.LanguageCode)
+            .Select(x => x.First())
+            .Select(x => new ListingTranslation
+            {
+                LanguageCode = x.LanguageCode,
+                Title = x.Title.Trim(),
+                Description = x.Description?.Trim() ?? string.Empty
+            })
+            .ToList();
     }
 
     private static void ValidateRequest(string title, decimal price, double area, int rooms, string contactPhone)

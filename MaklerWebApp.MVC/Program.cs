@@ -1,4 +1,8 @@
 using MaklerWebApp.DAL.Extensions;
+using MaklerWebApp.DAL.Localization;
+using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Localization.Routing;
+using Microsoft.Extensions.Options;
 
 namespace MaklerWebApp.MVC
 {
@@ -10,7 +14,25 @@ namespace MaklerWebApp.MVC
 
             // Add services to the container.
             builder.Services.AddControllersWithViews();
+            builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
             builder.Services.AddDataAccess(builder.Configuration);
+
+            builder.Services.Configure<RequestLocalizationOptions>(options =>
+            {
+                var supportedCultures = AppLanguageOptions.SupportedCultures;
+                options.DefaultRequestCulture = new RequestCulture(AppLanguageOptions.DefaultLanguage);
+                options.SupportedCultures = supportedCultures.ToList();
+                options.SupportedUICultures = supportedCultures.ToList();
+                options.ApplyCurrentCultureToResponseHeaders = true;
+
+                options.RequestCultureProviders = new List<IRequestCultureProvider>
+                {
+                    new RouteDataRequestCultureProvider { RouteDataStringKey = "culture", UIRouteDataStringKey = "culture" },
+                    new QueryStringRequestCultureProvider { QueryStringKey = "lang", UIQueryStringKey = "lang" },
+                    new CookieRequestCultureProvider(),
+                    new AcceptLanguageHeaderRequestCultureProvider()
+                };
+            });
 
             var app = builder.Build();
 
@@ -25,9 +47,16 @@ namespace MaklerWebApp.MVC
             app.UseHttpsRedirection();
             app.UseRouting();
 
+            var requestLocalizationOptions = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value;
+            app.UseRequestLocalization(requestLocalizationOptions);
+
             app.UseAuthorization();
 
             app.MapStaticAssets();
+            app.MapControllerRoute(
+                name: "localized-default",
+                pattern: "{culture=az}/{controller=Home}/{action=Index}/{id?}");
+
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}")

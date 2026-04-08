@@ -4,10 +4,14 @@ using MaklerWebApp.BLL.Extensions;
 using MaklerWebApp.BLL.Models;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Extensions;
+using MaklerWebApp.DAL.Localization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Globalization;
 using System.Text;
 
 namespace MaklerWebApp.API;
@@ -19,7 +23,28 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddControllers();
+        builder.Services.AddLocalization();
         builder.Services.AddScoped<IImageStorageService, LocalImageStorageService>();
+
+        builder.Services.Configure<RequestLocalizationOptions>(options =>
+        {
+            var supportedCultures = AppLanguageOptions.SupportedCultures;
+            options.DefaultRequestCulture = new RequestCulture(AppLanguageOptions.DefaultLanguage);
+            options.SupportedCultures = supportedCultures.ToList();
+            options.SupportedUICultures = supportedCultures.ToList();
+            options.ApplyCurrentCultureToResponseHeaders = true;
+
+            options.RequestCultureProviders = new List<IRequestCultureProvider>
+            {
+                new QueryStringRequestCultureProvider
+                {
+                    QueryStringKey = "lang",
+                    UIQueryStringKey = "lang"
+                },
+                new CookieRequestCultureProvider(),
+                new AcceptLanguageHeaderRequestCultureProvider()
+            };
+        });
 
         builder.Services.Configure<ApiBehaviorOptions>(options =>
         {
@@ -109,6 +134,8 @@ public class Program
 
         app.UseHttpsRedirection();
         app.UseStaticFiles();
+        var requestLocalizationOptions = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value;
+        app.UseRequestLocalization(requestLocalizationOptions);
         app.UseMiddleware<ApiExceptionMiddleware>();
 
         app.UseAuthentication();
