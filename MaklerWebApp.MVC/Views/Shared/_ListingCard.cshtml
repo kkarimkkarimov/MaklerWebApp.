@@ -1,0 +1,20 @@
+@model ListingCardViewModel
+
+<article class="listing-card h-100">
+    <div class="listing-card-image-wrap">
+        <img src="@Model.ImageUrl" alt="@Model.Title" class="listing-card-image" loading="lazy" />
+        @if (Model.IsFeatured)
+        {
+            <span class="listing-badge">Featured</span>
+        }
+    </div>
+    <div class="listing-card-body">
+        <h3 class="listing-card-title">@Model.Title</h3>
+        <p class="listing-card-location">@Model.Location</p>
+        <div class="listing-card-meta">
+            <span>@Model.Rooms otaq</span>
+            <span>@Model.Area m²</span>
+        </div>
+        <p class="listing-card-price">@Model.Price.ToString("N0") @Model.Currency</p>
+    </div>
+</article>

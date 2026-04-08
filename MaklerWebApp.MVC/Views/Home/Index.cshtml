@@ -1,18 +1,81 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Ana səhifə";
     var apiHealthy = ViewData["ApiHealthy"] as bool?;
     var publicListingCount = ViewData["PublicListingCount"] as int?;
+
+    var featuredListings = new List<ListingCardViewModel>
+    {
+        new()
+        {
+            Title = "Nərimanovda premium yeni tikili",
+            Location = "Bakı, Nərimanov",
+            Price = 315000,
+            Rooms = 3,
+            Area = 128,
+            IsFeatured = true,
+            ImageUrl = "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=1200&q=80"
+        },
+        new()
+        {
+            Title = "Dəniz mənzərəli villa",
+            Location = "Bakı, Mərdəkan",
+            Price = 680000,
+            Rooms = 6,
+            Area = 420,
+            IsFeatured = true,
+            ImageUrl = "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1200&q=80"
+        },
+        new()
+        {
+            Title = "Yasamalda ailə mənzili",
+            Location = "Bakı, Yasamal",
+            Price = 189000,
+            Rooms = 2,
+            Area = 92,
+            IsFeatured = false,
+            ImageUrl = "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80"
+        }
+    };
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-    @if (apiHealthy.HasValue)
-    {
-        <p>API status: <strong>@(apiHealthy.Value ? "Healthy" : "Unavailable")</strong></p>
-    }
-    @if (publicListingCount.HasValue)
-    {
-        <p>Public listings available: <strong>@publicListingCount.Value</strong></p>
-    }
-</div>
+<section class="hero-card mb-5">
+    <p class="text-uppercase text-primary fw-semibold mb-2">MaklerWebApp</p>
+    <h1 class="hero-title">Daşınmaz əmlakı daha sürətli və daha rahat tapın</h1>
+    <p class="hero-subtitle mb-4">Satış və kirayə elanlarını filtr, müqayisə et və bir neçə kliklə ən uyğun variantı seç.</p>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a class="btn btn-brand" href="#featured-listings">Premium elanlara bax</a>
+        <a class="btn btn-outline-secondary" href="#">Bütün elanlar</a>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <p class="stat-value">@(publicListingCount ?? 0)</p>
+            <p class="stat-label">Aktiv elan</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-value">24/7</p>
+            <p class="stat-label">Platforma əlçatanlığı</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-value">@(apiHealthy == true ? "Online" : "Offline")</p>
+            <p class="stat-label">API statusu</p>
+        </div>
+    </div>
+</section>
+
+<section id="featured-listings">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="section-title mb-0">Seçilmiş elanlar</h2>
+        <a href="#" class="text-decoration-none">Hamısına bax</a>
+    </div>
+
+    <div class="row g-4">
+        @foreach (var listing in featuredListings)
+        {
+            <div class="col-12 col-md-6 col-xl-4">
+                <partial name="_ListingCard" model="listing" />
+            </div>
+        }
+    </div>
+</section>
