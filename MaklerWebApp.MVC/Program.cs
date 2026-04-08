@@ -1,3 +1,5 @@
+using MaklerWebApp.DAL.Extensions;
+
 namespace MaklerWebApp.MVC
 {
     public class Program
@@ -8,6 +10,7 @@ namespace MaklerWebApp.MVC
 
             // Add services to the container.
             builder.Services.AddControllersWithViews();
+            builder.Services.AddDataAccess(builder.Configuration);
 
             var app = builder.Build();
 

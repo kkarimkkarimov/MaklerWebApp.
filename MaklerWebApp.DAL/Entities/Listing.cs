@@ -21,7 +21,10 @@ public class Listing
     public string Address { get; set; } = string.Empty;
     public bool IsNewBuilding { get; set; }
     public bool HasMortgage { get; set; }
+    public bool IsMortgageEligible { get; set; }
     public bool IsFurnished { get; set; }
+    public RepairStatus RepairStatus { get; set; }
+    public DocumentStatus DocumentStatus { get; set; }
     public string ContactName { get; set; } = string.Empty;
     public string ContactPhone { get; set; } = string.Empty;
     public ListingStatus Status { get; set; } = ListingStatus.Pending;

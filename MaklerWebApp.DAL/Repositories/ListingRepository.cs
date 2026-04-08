@@ -97,9 +97,24 @@ public class ListingRepository : IListingRepository
             query = query.Where(x => x.HasMortgage == criteria.HasMortgage.Value);
         }
 
+        if (criteria.IsMortgageEligible.HasValue)
+        {
+            query = query.Where(x => x.IsMortgageEligible == criteria.IsMortgageEligible.Value);
+        }
+
         if (criteria.IsFurnished.HasValue)
         {
             query = query.Where(x => x.IsFurnished == criteria.IsFurnished.Value);
+        }
+
+        if (criteria.RepairStatus.HasValue)
+        {
+            query = query.Where(x => x.RepairStatus == criteria.RepairStatus.Value);
+        }
+
+        if (criteria.DocumentStatus.HasValue)
+        {
+            query = query.Where(x => x.DocumentStatus == criteria.DocumentStatus.Value);
         }
 
         if (criteria.IsFeatured.HasValue)
@@ -215,7 +230,10 @@ public class ListingRepository : IListingRepository
         existing.Address = listing.Address;
         existing.IsNewBuilding = listing.IsNewBuilding;
         existing.HasMortgage = listing.HasMortgage;
+        existing.IsMortgageEligible = listing.IsMortgageEligible;
         existing.IsFurnished = listing.IsFurnished;
+        existing.RepairStatus = listing.RepairStatus;
+        existing.DocumentStatus = listing.DocumentStatus;
         existing.ContactName = listing.ContactName;
         existing.ContactPhone = listing.ContactPhone;
         existing.Status = listing.Status;

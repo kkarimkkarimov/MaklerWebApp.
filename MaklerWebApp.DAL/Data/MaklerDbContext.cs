@@ -39,6 +39,7 @@ public class MaklerDbContext : DbContext
 
             entity.HasIndex(x => new { x.City, x.District });
             entity.HasIndex(x => new { x.ListingType, x.PropertyType });
+            entity.HasIndex(x => new { x.RepairStatus, x.DocumentStatus, x.IsMortgageEligible });
             entity.HasIndex(x => x.Price);
             entity.HasIndex(x => x.PublishedAt);
             entity.HasIndex(x => new { x.IsDeleted, x.Status, x.IsFeatured });

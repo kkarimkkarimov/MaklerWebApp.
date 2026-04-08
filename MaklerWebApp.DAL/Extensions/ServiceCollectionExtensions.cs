@@ -11,7 +11,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddDataAccess(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? "Server=localhost;Database=MaklerWebAppDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
 
         services.AddDbContext<MaklerDbContext>(options =>
             options.UseSqlServer(connectionString, sqlOptions =>

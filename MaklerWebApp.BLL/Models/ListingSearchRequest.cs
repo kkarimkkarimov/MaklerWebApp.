@@ -17,7 +17,10 @@ public class ListingSearchRequest
     public int? MaxRooms { get; set; }
     public bool? IsNewBuilding { get; set; }
     public bool? HasMortgage { get; set; }
+    public bool? IsMortgageEligible { get; set; }
     public bool? IsFurnished { get; set; }
+    public RepairStatus? RepairStatus { get; set; }
+    public DocumentStatus? DocumentStatus { get; set; }
     public bool? IsFeatured { get; set; }
     public ListingStatus? Status { get; set; }
     public AdStatus? AdStatus { get; set; }

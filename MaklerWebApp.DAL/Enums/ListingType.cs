@@ -3,5 +3,6 @@ namespace MaklerWebApp.DAL.Enums;
 public enum ListingType
 {
     Sale = 1,
-    Rent = 2
+    MonthlyRent = 2,
+    DailyRent = 3
 }
