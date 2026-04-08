@@ -2,11 +2,14 @@ using MaklerWebApp.MVC.Services.Api.Contracts;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace MaklerWebApp.MVC.Services.Api;
 
 public class MaklerApiClient : IMaklerApiClient
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly HttpClient _httpClient;
 
     public MaklerApiClient(HttpClient httpClient)
@@ -60,13 +63,36 @@ public class MaklerApiClient : IMaklerApiClient
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<ApiTokenResponse>(cancellationToken: cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ApiTokenResponse>(JsonOptions, cancellationToken);
+    }
+
+    public async Task<ApiTokenResponse?> RegisterAsync(ApiRegisterRequest request, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/auth/register", request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiTokenResponse>(JsonOptions, cancellationToken);
     }
 
     public async Task<bool> RequestOtpAsync(string emailOrPhone, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/request-otp", new { emailOrPhone }, cancellationToken);
         return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> VerifyOtpAsync(ApiVerifyOtpRequest request, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/auth/verify-otp", request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return false;
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<ApiVerifyOtpResponse>(JsonOptions, cancellationToken);
+        return payload?.Verified == true;
     }
 
     public async Task<int?> GetPublicListingCountAsync(CancellationToken cancellationToken = default)
@@ -77,7 +103,7 @@ public class MaklerApiClient : IMaklerApiClient
             return null;
         }
 
-        var result = await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(cancellationToken: cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(JsonOptions, cancellationToken);
         return result?.TotalCount;
     }
 
@@ -92,7 +118,7 @@ public class MaklerApiClient : IMaklerApiClient
             return Array.Empty<ApiPaymentHistoryItem>();
         }
 
-        var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiPaymentHistoryItem>>(cancellationToken: cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiPaymentHistoryItem>>(JsonOptions, cancellationToken);
         return result ?? Array.Empty<ApiPaymentHistoryItem>();
     }
 }

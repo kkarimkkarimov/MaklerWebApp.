@@ -1,0 +1,262 @@
+using MaklerWebApp.MVC.Infrastructure;
+using MaklerWebApp.MVC.Models;
+using MaklerWebApp.MVC.Services.Api;
+using MaklerWebApp.MVC.Services.Api.Contracts;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.Text.Json;
+
+namespace MaklerWebApp.MVC.Controllers;
+
+public class AccountController : Controller
+{
+    private readonly IMaklerApiClient _maklerApiClient;
+
+    public AccountController(IMaklerApiClient maklerApiClient)
+    {
+        _maklerApiClient = maklerApiClient;
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult Login(string? returnUrl = null)
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            return RedirectToAction(nameof(Cabinet));
+        }
+
+        return View(new LoginViewModel { ReturnUrl = returnUrl });
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Login(LoginViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var tokenResponse = await _maklerApiClient.LoginAsync(new ApiLoginRequest
+        {
+            Email = model.Email,
+            Password = model.Password
+        }, cancellationToken);
+
+        if (tokenResponse is null)
+        {
+            ModelState.AddModelError(string.Empty, "Email və ya şifrə yanlışdır.");
+            return View(model);
+        }
+
+        await SignInAsync(tokenResponse, model.RememberMe);
+
+        if (!string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
+        {
+            return Redirect(model.ReturnUrl);
+        }
+
+        return RedirectToAction(nameof(Cabinet));
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult Register()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            return RedirectToAction(nameof(Cabinet));
+        }
+
+        return View(new RegisterViewModel());
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Register(RegisterViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var tokenResponse = await _maklerApiClient.RegisterAsync(new ApiRegisterRequest
+        {
+            FullName = model.FullName,
+            Email = model.Email,
+            PhoneNumber = model.PhoneNumber,
+            Password = model.Password
+        }, cancellationToken);
+
+        if (tokenResponse is null)
+        {
+            ModelState.AddModelError(string.Empty, "Qeydiyyat uğursuz oldu. Yenidən cəhd edin.");
+            return View(model);
+        }
+
+        await SignInAsync(tokenResponse, isPersistent: false);
+        await _maklerApiClient.RequestOtpAsync(model.Email, cancellationToken);
+
+        TempData["SuccessMessage"] = "OTP kodu göndərildi. Hesabı təsdiqləyin.";
+        return RedirectToAction(nameof(VerifyOtp), new { emailOrPhone = model.Email });
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult VerifyOtp(string? emailOrPhone = null)
+    {
+        return View(new VerifyOtpViewModel
+        {
+            EmailOrPhone = emailOrPhone ?? User.FindFirstValue(ClaimTypes.Email) ?? string.Empty
+        });
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var verified = await _maklerApiClient.VerifyOtpAsync(new ApiVerifyOtpRequest
+        {
+            EmailOrPhone = model.EmailOrPhone,
+            Code = model.Code
+        }, cancellationToken);
+
+        if (!verified)
+        {
+            ModelState.AddModelError(nameof(model.Code), "Kod yanlışdır və ya vaxtı bitib.");
+            return View(model);
+        }
+
+        TempData["SuccessMessage"] = "Hesab uğurla təsdiqləndi.";
+        return RedirectToAction(nameof(Cabinet));
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> Cabinet(CancellationToken cancellationToken)
+    {
+        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync();
+            return RedirectToAction(nameof(Login));
+        }
+
+        var paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
+        return View(new CabinetViewModel
+        {
+            PaymentHistory = paymentHistory
+        });
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        await SignOutAsync();
+        return RedirectToAction(nameof(Login));
+    }
+
+    private async Task SignInAsync(ApiTokenResponse tokenResponse, bool isPersistent)
+    {
+        var claims = ReadClaims(tokenResponse.AccessToken);
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            new AuthenticationProperties
+            {
+                IsPersistent = isPersistent,
+                ExpiresUtc = tokenResponse.AccessTokenExpiresAt
+            });
+
+        HttpContext.Session.SetString(AuthSessionKeys.AccessToken, tokenResponse.AccessToken);
+        HttpContext.Session.SetString(AuthSessionKeys.RefreshToken, tokenResponse.RefreshToken);
+    }
+
+    private async Task SignOutAsync()
+    {
+        HttpContext.Session.Remove(AuthSessionKeys.AccessToken);
+        HttpContext.Session.Remove(AuthSessionKeys.RefreshToken);
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    }
+
+    private static IReadOnlyList<Claim> ReadClaims(string jwt)
+    {
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            return Array.Empty<Claim>();
+        }
+
+        var parts = jwt.Split('.');
+        if (parts.Length < 2)
+        {
+            return Array.Empty<Claim>();
+        }
+
+        var payloadJson = Base64UrlDecode(parts[1]);
+        using var document = JsonDocument.Parse(payloadJson);
+        var root = document.RootElement;
+
+        var sub = TryGetString(root, ClaimTypes.NameIdentifier) ?? TryGetString(root, "sub");
+        var email = TryGetString(root, ClaimTypes.Email) ?? TryGetString(root, "email");
+        var name = TryGetString(root, ClaimTypes.Name) ?? email ?? "User";
+        var role = TryGetString(root, ClaimTypes.Role) ?? TryGetString(root, "role");
+
+        var claims = new List<Claim>();
+        if (!string.IsNullOrWhiteSpace(sub))
+        {
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, sub));
+        }
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            claims.Add(new Claim(ClaimTypes.Email, email));
+        }
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            claims.Add(new Claim(ClaimTypes.Name, name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        return claims;
+    }
+
+    private static string? TryGetString(JsonElement root, string propertyName)
+    {
+        if (root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String)
+        {
+            return value.GetString();
+        }
+
+        return null;
+    }
+
+    private static string Base64UrlDecode(string input)
+    {
+        var output = input.Replace('-', '+').Replace('_', '/');
+        output = output.PadRight(output.Length + (4 - output.Length % 4) % 4, '=');
+        var bytes = Convert.FromBase64String(output);
+        return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+}

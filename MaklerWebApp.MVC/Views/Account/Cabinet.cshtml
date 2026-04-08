@@ -1,0 +1,56 @@
+@model CabinetViewModel
+
+@{
+    ViewData["Title"] = "Şəxsi kabinet";
+}
+
+<section class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <h1 class="hero-title fs-2 mb-1">Şəxsi kabinet</h1>
+        <p class="hero-subtitle mb-0">Ödəniş tarixçəniz və hesab məlumatlarınız.</p>
+    </div>
+    <form asp-action="Logout" method="post">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline-secondary">Çıxış</button>
+    </form>
+</section>
+
+<section class="filter-panel">
+    <h2 class="section-title">Ödəniş tarixçəsi</h2>
+
+    @if (Model.PaymentHistory.Count == 0)
+    {
+        <div class="empty-state">
+            <h3 class="h5 mb-2">Hələ ödəniş yoxdur</h3>
+            <p class="text-muted mb-0">Boost/VIP xidmətləri istifadə etdikcə tarixçə burada görünəcək.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Listing</th>
+                        <th>Məbləğ</th>
+                        <th>Status</th>
+                        <th>Tarix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.PaymentHistory)
+                    {
+                        <tr>
+                            <td>@item.Id</td>
+                            <td>@item.ListingId</td>
+                            <td>@item.Amount.ToString("N2") AZN</td>
+                            <td>@item.Status</td>
+                            <td>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

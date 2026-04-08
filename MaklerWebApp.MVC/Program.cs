@@ -1,6 +1,7 @@
 using MaklerWebApp.MVC.Localization;
 using MaklerWebApp.MVC.Options;
 using MaklerWebApp.MVC.Services.Api;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Localization.Routing;
 using Microsoft.Extensions.Options;
@@ -16,6 +17,29 @@ namespace MaklerWebApp.MVC
             // Add services to the container.
             builder.Services.AddControllersWithViews();
             builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession(options =>
+            {
+                options.Cookie.Name = "MaklerWebApp.Session";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.IdleTimeout = TimeSpan.FromHours(8);
+            });
+            builder.Services
+                .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.Cookie.Name = "MaklerWebApp.Auth";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
+                    options.LoginPath = "/Account/Login";
+                    options.AccessDeniedPath = "/Account/Login";
+                    options.SlidingExpiration = true;
+                    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+                });
+            builder.Services.AddAuthorization();
             builder.Services.Configure<ApiClientOptions>(builder.Configuration.GetSection(ApiClientOptions.SectionName));
             builder.Services.AddHttpClient<IMaklerApiClient, MaklerApiClient>((serviceProvider, httpClient) =>
             {
@@ -57,10 +81,12 @@ namespace MaklerWebApp.MVC
 
             app.UseHttpsRedirection();
             app.UseRouting();
+            app.UseSession();
 
             var requestLocalizationOptions = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value;
             app.UseRequestLocalization(requestLocalizationOptions);
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapStaticAssets();
