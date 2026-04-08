@@ -17,6 +17,7 @@ namespace MaklerWebApp.MVC.Controllers
         public async Task<IActionResult> Index()
         {
             ViewData["ApiHealthy"] = await _maklerApiClient.IsHealthyAsync(HttpContext.RequestAborted);
+            ViewData["PublicListingCount"] = await _maklerApiClient.GetPublicListingCountAsync(HttpContext.RequestAborted);
             return View();
         }
 

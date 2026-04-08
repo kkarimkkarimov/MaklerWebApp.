@@ -1,6 +1,7 @@
 ﻿@{
     ViewData["Title"] = "Home Page";
     var apiHealthy = ViewData["ApiHealthy"] as bool?;
+    var publicListingCount = ViewData["PublicListingCount"] as int?;
 }
 
 <div class="text-center">
@@ -9,5 +10,9 @@
     @if (apiHealthy.HasValue)
     {
         <p>API status: <strong>@(apiHealthy.Value ? "Healthy" : "Unavailable")</strong></p>
+    }
+    @if (publicListingCount.HasValue)
+    {
+        <p>Public listings available: <strong>@publicListingCount.Value</strong></p>
     }
 </div>
