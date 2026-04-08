@@ -1,5 +1,4 @@
-using MaklerWebApp.DAL.Extensions;
-using MaklerWebApp.DAL.Localization;
+using MaklerWebApp.MVC.Localization;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Localization.Routing;
 using Microsoft.Extensions.Options;
@@ -15,7 +14,6 @@ namespace MaklerWebApp.MVC
             // Add services to the container.
             builder.Services.AddControllersWithViews();
             builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-            builder.Services.AddDataAccess(builder.Configuration);
 
             builder.Services.Configure<RequestLocalizationOptions>(options =>
             {
