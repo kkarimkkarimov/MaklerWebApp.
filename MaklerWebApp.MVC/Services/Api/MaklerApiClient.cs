@@ -1,4 +1,5 @@
 using MaklerWebApp.MVC.Services.Api.Contracts;
+using Microsoft.AspNetCore.WebUtilities;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
@@ -24,6 +25,31 @@ public class MaklerApiClient : IMaklerApiClient
         {
             return false;
         }
+    }
+
+    public async Task<ApiPagedResult<ApiListingSummary>> SearchListingsAsync(ApiListingSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var queryParams = new Dictionary<string, string?>
+        {
+            ["keyword"] = request.Keyword,
+            ["city"] = request.City,
+            ["minPrice"] = request.MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["maxPrice"] = request.MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["page"] = request.Page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["pageSize"] = request.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["sortBy"] = request.SortBy,
+            ["descending"] = request.Descending.ToString().ToLowerInvariant()
+        };
+
+        var url = QueryHelpers.AddQueryString("api/listings", queryParams!);
+        using var response = await _httpClient.GetAsync(url, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return new ApiPagedResult<ApiListingSummary>();
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(cancellationToken: cancellationToken)
+               ?? new ApiPagedResult<ApiListingSummary>();
     }
 
     public async Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default)

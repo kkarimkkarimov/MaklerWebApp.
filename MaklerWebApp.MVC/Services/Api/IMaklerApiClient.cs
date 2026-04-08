@@ -5,6 +5,7 @@ namespace MaklerWebApp.MVC.Services.Api;
 public interface IMaklerApiClient
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
+    Task<ApiPagedResult<ApiListingSummary>> SearchListingsAsync(ApiListingSearchRequest request, CancellationToken cancellationToken = default);
     Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default);
     Task<bool> RequestOtpAsync(string emailOrPhone, CancellationToken cancellationToken = default);
     Task<int?> GetPublicListingCountAsync(CancellationToken cancellationToken = default);
