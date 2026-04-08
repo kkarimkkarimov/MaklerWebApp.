@@ -8,6 +8,13 @@ namespace MaklerWebApp.BLL.Services;
 
 public class PaymentService : IPaymentService
 {
+    private static readonly IReadOnlyDictionary<PaymentServiceType, decimal> ServicePrices = new Dictionary<PaymentServiceType, decimal>
+    {
+        [PaymentServiceType.Vip] = 49.00m,
+        [PaymentServiceType.Premium] = 29.00m,
+        [PaymentServiceType.Boost] = 9.00m
+    };
+
     private readonly MaklerDbContext _dbContext;
 
     public PaymentService(MaklerDbContext dbContext)
@@ -23,23 +30,19 @@ public class PaymentService : IPaymentService
             throw new ArgumentException("Listing not found for current user.");
         }
 
+        var amount = GetServicePrice(request.ServiceType);
+
         var transaction = new PaymentTransaction
         {
             UserId = userId,
             ListingId = request.ListingId,
             ServiceType = request.ServiceType,
-            Amount = request.Amount,
-            Status = PaymentStatus.Success,
+            Amount = amount,
+            Status = PaymentStatus.Pending,
             Reference = Guid.NewGuid().ToString("N")
         };
 
         _dbContext.PaymentTransactions.Add(transaction);
-
-        if (request.ServiceType is PaymentServiceType.Vip or PaymentServiceType.Premium or PaymentServiceType.Boost)
-        {
-            listing.IsFeatured = true;
-            listing.FeaturedUntil = DateTime.UtcNow.AddDays(request.ServiceType == PaymentServiceType.Vip ? 30 : 14);
-        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -53,6 +56,39 @@ public class PaymentService : IPaymentService
             Reference = transaction.Reference,
             CreatedAt = transaction.CreatedAt
         };
+    }
+
+    public async Task<PaymentHistoryDto?> ConfirmBoostAsync(ConfirmBoostPaymentRequest request, CancellationToken cancellationToken = default)
+    {
+        var reference = request.Reference.Trim();
+        var transaction = await _dbContext.PaymentTransactions
+            .Include(x => x.Listing)
+            .FirstOrDefaultAsync(x => x.Reference == reference, cancellationToken);
+
+        if (transaction is null || transaction.Status != PaymentStatus.Pending)
+        {
+            return null;
+        }
+
+        if (!request.Succeeded)
+        {
+            transaction.Status = PaymentStatus.Failed;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return MapToHistoryDto(transaction);
+        }
+
+        if (request.PaidAmount != transaction.Amount)
+        {
+            transaction.Status = PaymentStatus.Failed;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            throw new ArgumentException("Paid amount does not match expected amount.");
+        }
+
+        transaction.Status = PaymentStatus.Success;
+        ApplyFeatureWindow(transaction.Listing, transaction.ServiceType);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return MapToHistoryDto(transaction);
     }
 
     public async Task<IReadOnlyList<PaymentHistoryDto>> GetHistoryAsync(int userId, CancellationToken cancellationToken = default)
@@ -72,5 +108,36 @@ public class PaymentService : IPaymentService
                 CreatedAt = x.CreatedAt
             })
             .ToListAsync(cancellationToken);
+    }
+
+    private static decimal GetServicePrice(PaymentServiceType serviceType)
+    {
+        if (!ServicePrices.TryGetValue(serviceType, out var amount))
+        {
+            throw new ArgumentOutOfRangeException(nameof(serviceType), serviceType, "Unsupported payment service type.");
+        }
+
+        return amount;
+    }
+
+    private static void ApplyFeatureWindow(Listing listing, PaymentServiceType serviceType)
+    {
+        listing.IsFeatured = true;
+        listing.FeaturedUntil = DateTime.UtcNow.AddDays(serviceType == PaymentServiceType.Vip ? 30 : 14);
+        listing.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static PaymentHistoryDto MapToHistoryDto(PaymentTransaction transaction)
+    {
+        return new PaymentHistoryDto
+        {
+            Id = transaction.Id,
+            ListingId = transaction.ListingId,
+            ServiceType = transaction.ServiceType,
+            Amount = transaction.Amount,
+            Status = transaction.Status,
+            Reference = transaction.Reference,
+            CreatedAt = transaction.CreatedAt
+        };
     }
 }
