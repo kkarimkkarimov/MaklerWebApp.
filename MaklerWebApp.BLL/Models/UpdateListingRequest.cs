@@ -1,4 +1,4 @@
-using MaklerWebApp.DAL.Enums;
+using MaklerWebApp.BLL.Contracts.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace MaklerWebApp.BLL.Models;

@@ -1,8 +1,10 @@
+using MaklerWebApp.BLL.Contracts.Enums;
 using MaklerWebApp.BLL.Models;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Entities;
-using MaklerWebApp.DAL.Enums;
 using Microsoft.EntityFrameworkCore;
+
+using DalEnums = MaklerWebApp.DAL.Enums;
 
 namespace MaklerWebApp.BLL.Services;
 
@@ -36,9 +38,9 @@ public class PaymentService : IPaymentService
         {
             UserId = userId,
             ListingId = request.ListingId,
-            ServiceType = request.ServiceType,
+            ServiceType = (DalEnums.PaymentServiceType)request.ServiceType,
             Amount = amount,
-            Status = PaymentStatus.Pending,
+            Status = DalEnums.PaymentStatus.Pending,
             Reference = Guid.NewGuid().ToString("N")
         };
 
@@ -50,9 +52,9 @@ public class PaymentService : IPaymentService
         {
             Id = transaction.Id,
             ListingId = transaction.ListingId,
-            ServiceType = transaction.ServiceType,
+            ServiceType = (PaymentServiceType)transaction.ServiceType,
             Amount = transaction.Amount,
-            Status = transaction.Status,
+            Status = (PaymentStatus)transaction.Status,
             Reference = transaction.Reference,
             CreatedAt = transaction.CreatedAt
         };
@@ -65,27 +67,27 @@ public class PaymentService : IPaymentService
             .Include(x => x.Listing)
             .FirstOrDefaultAsync(x => x.Reference == reference, cancellationToken);
 
-        if (transaction is null || transaction.Status != PaymentStatus.Pending)
+        if (transaction is null || transaction.Status != DalEnums.PaymentStatus.Pending)
         {
             return null;
         }
 
         if (!request.Succeeded)
         {
-            transaction.Status = PaymentStatus.Failed;
+            transaction.Status = DalEnums.PaymentStatus.Failed;
             await _dbContext.SaveChangesAsync(cancellationToken);
             return MapToHistoryDto(transaction);
         }
 
         if (request.PaidAmount != transaction.Amount)
         {
-            transaction.Status = PaymentStatus.Failed;
+            transaction.Status = DalEnums.PaymentStatus.Failed;
             await _dbContext.SaveChangesAsync(cancellationToken);
             throw new ArgumentException("Paid amount does not match expected amount.");
         }
 
-        transaction.Status = PaymentStatus.Success;
-        ApplyFeatureWindow(transaction.Listing, transaction.ServiceType);
+        transaction.Status = DalEnums.PaymentStatus.Success;
+        ApplyFeatureWindow(transaction.Listing, (PaymentServiceType)transaction.ServiceType);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return MapToHistoryDto(transaction);
@@ -101,9 +103,9 @@ public class PaymentService : IPaymentService
             {
                 Id = x.Id,
                 ListingId = x.ListingId,
-                ServiceType = x.ServiceType,
+                ServiceType = (PaymentServiceType)x.ServiceType,
                 Amount = x.Amount,
-                Status = x.Status,
+                Status = (PaymentStatus)x.Status,
                 Reference = x.Reference,
                 CreatedAt = x.CreatedAt
             })
@@ -133,9 +135,9 @@ public class PaymentService : IPaymentService
         {
             Id = transaction.Id,
             ListingId = transaction.ListingId,
-            ServiceType = transaction.ServiceType,
+            ServiceType = (PaymentServiceType)transaction.ServiceType,
             Amount = transaction.Amount,
-            Status = transaction.Status,
+            Status = (PaymentStatus)transaction.Status,
             Reference = transaction.Reference,
             CreatedAt = transaction.CreatedAt
         };

@@ -1,12 +1,14 @@
+using MaklerWebApp.BLL.Contracts.Enums;
 using MaklerWebApp.BLL.Models;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Entities;
-using MaklerWebApp.DAL.Enums;
 using MaklerWebApp.DAL.Localization;
 using MaklerWebApp.DAL.Models;
 using MaklerWebApp.DAL.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+
+using DalEnums = MaklerWebApp.DAL.Enums;
 
 namespace MaklerWebApp.BLL.Services;
 
@@ -31,8 +33,8 @@ public class ListingService : IListingService
             Keyword = request.Keyword,
             City = request.City,
             District = request.District,
-            ListingType = request.ListingType,
-            PropertyType = request.PropertyType,
+            ListingType = request.ListingType.HasValue ? (DalEnums.ListingType?)request.ListingType.Value : null,
+            PropertyType = request.PropertyType.HasValue ? (DalEnums.PropertyType?)request.PropertyType.Value : null,
             MinPrice = request.MinPrice,
             MaxPrice = request.MaxPrice,
             MinArea = request.MinArea,
@@ -43,15 +45,15 @@ public class ListingService : IListingService
             HasMortgage = request.HasMortgage,
             IsMortgageEligible = request.IsMortgageEligible,
             IsFurnished = request.IsFurnished,
-            RepairStatus = request.RepairStatus,
-            DocumentStatus = request.DocumentStatus,
+            RepairStatus = request.RepairStatus.HasValue ? (DalEnums.RepairStatus?)request.RepairStatus.Value : null,
+            DocumentStatus = request.DocumentStatus.HasValue ? (DalEnums.DocumentStatus?)request.DocumentStatus.Value : null,
             IsFeatured = request.IsFeatured,
-            Status = request.Status ?? ListingStatus.Approved,
-            AdStatus = request.AdStatus,
+            Status = DalEnums.ListingStatus.Approved,
+            AdStatus = request.AdStatus.HasValue ? (DalEnums.AdStatus?)request.AdStatus.Value : null,
             PublishedFrom = request.PublishedFrom,
             PublishedTo = request.PublishedTo,
             OnlyWithImages = request.OnlyWithImages,
-            IncludeDeleted = request.IncludeDeleted,
+            IncludeDeleted = false,
             SortBy = request.SortBy,
             Descending = request.Descending,
             Page = page,
@@ -112,13 +114,13 @@ public class ListingService : IListingService
             Title = request.Title.Trim(),
             Description = request.Description.Trim(),
             Price = request.Price,
-            CurrencyType = request.CurrencyType,
+            CurrencyType = (DalEnums.CurrencyType)request.CurrencyType,
             Area = request.Area,
             Rooms = request.Rooms,
             Floor = request.Floor,
             TotalFloors = request.TotalFloors,
-            PropertyType = request.PropertyType,
-            ListingType = request.ListingType,
+            PropertyType = (DalEnums.PropertyType)request.PropertyType,
+            ListingType = (DalEnums.ListingType)request.ListingType,
             City = request.City.Trim(),
             District = request.District.Trim(),
             Address = request.Address.Trim(),
@@ -126,11 +128,11 @@ public class ListingService : IListingService
             HasMortgage = request.HasMortgage,
             IsMortgageEligible = request.IsMortgageEligible,
             IsFurnished = request.IsFurnished,
-            RepairStatus = request.RepairStatus,
-            DocumentStatus = request.DocumentStatus,
+            RepairStatus = (DalEnums.RepairStatus)request.RepairStatus,
+            DocumentStatus = (DalEnums.DocumentStatus)request.DocumentStatus,
             ContactName = request.ContactName.Trim(),
             ContactPhone = request.ContactPhone.Trim(),
-            Status = ListingStatus.Pending,
+            Status = DalEnums.ListingStatus.Pending,
             Images = request.Images
                 .Where(x => !string.IsNullOrWhiteSpace(x.ImageUrl))
                 .Select(x => new ListingImage
@@ -167,13 +169,13 @@ public class ListingService : IListingService
             Title = request.Title.Trim(),
             Description = request.Description.Trim(),
             Price = request.Price,
-            CurrencyType = request.CurrencyType,
+            CurrencyType = (DalEnums.CurrencyType)request.CurrencyType,
             Area = request.Area,
             Rooms = request.Rooms,
             Floor = request.Floor,
             TotalFloors = request.TotalFloors,
-            PropertyType = request.PropertyType,
-            ListingType = request.ListingType,
+            PropertyType = (DalEnums.PropertyType)request.PropertyType,
+            ListingType = (DalEnums.ListingType)request.ListingType,
             City = request.City.Trim(),
             District = request.District.Trim(),
             Address = request.Address.Trim(),
@@ -181,11 +183,11 @@ public class ListingService : IListingService
             HasMortgage = request.HasMortgage,
             IsMortgageEligible = request.IsMortgageEligible,
             IsFurnished = request.IsFurnished,
-            RepairStatus = request.RepairStatus,
-            DocumentStatus = request.DocumentStatus,
+            RepairStatus = (DalEnums.RepairStatus)request.RepairStatus,
+            DocumentStatus = (DalEnums.DocumentStatus)request.DocumentStatus,
             ContactName = request.ContactName.Trim(),
             ContactPhone = request.ContactPhone.Trim(),
-            Status = ListingStatus.Pending,
+            Status = DalEnums.ListingStatus.Pending,
             ModerationNote = null,
             ModeratedAt = null,
             Images = request.Images
@@ -219,7 +221,7 @@ public class ListingService : IListingService
 
     public Task<bool> ModerateAsync(int id, ModerateListingRequest request, CancellationToken cancellationToken = default)
     {
-        return _listingRepository.SetStatusAsync(id, request.Status, request.ModerationNote, cancellationToken);
+        return _listingRepository.SetStatusAsync(id, (DalEnums.ListingStatus)request.Status, request.ModerationNote, cancellationToken);
     }
 
     public Task<bool> SetFeaturedAsync(int id, SetFeaturedRequest request, CancellationToken cancellationToken = default)
@@ -240,7 +242,7 @@ public class ListingService : IListingService
             return false;
         }
 
-        existing.AdStatus = request.AdStatus;
+        existing.AdStatus = (DalEnums.AdStatus)request.AdStatus;
         existing.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
@@ -406,13 +408,13 @@ public class ListingService : IListingService
             Title = listing.Title,
             Description = listing.Description,
             Price = listing.Price,
-            CurrencyType = listing.CurrencyType,
+            CurrencyType = (CurrencyType)listing.CurrencyType,
             Area = listing.Area,
             Rooms = listing.Rooms,
             Floor = listing.Floor,
             TotalFloors = listing.TotalFloors,
-            PropertyType = listing.PropertyType,
-            ListingType = listing.ListingType,
+            PropertyType = (PropertyType)listing.PropertyType,
+            ListingType = (ListingType)listing.ListingType,
             City = listing.City,
             District = listing.District,
             Address = listing.Address,
@@ -420,16 +422,16 @@ public class ListingService : IListingService
             HasMortgage = listing.HasMortgage,
             IsMortgageEligible = listing.IsMortgageEligible,
             IsFurnished = listing.IsFurnished,
-            RepairStatus = listing.RepairStatus,
-            DocumentStatus = listing.DocumentStatus,
+            RepairStatus = (RepairStatus)listing.RepairStatus,
+            DocumentStatus = (DocumentStatus)listing.DocumentStatus,
             ContactName = listing.ContactName,
             ContactPhone = listing.ContactPhone,
-            Status = listing.Status,
+            Status = (ListingStatus)listing.Status,
             ModerationNote = listing.ModerationNote,
             ModeratedAt = listing.ModeratedAt,
             IsFeatured = listing.IsFeatured,
             FeaturedUntil = listing.FeaturedUntil,
-            AdStatus = listing.AdStatus,
+            AdStatus = (AdStatus)listing.AdStatus,
             ViewCount = listing.ViewCount,
             PublishedAt = listing.PublishedAt,
             DisplayTitle = localized?.Title ?? listing.Title,
