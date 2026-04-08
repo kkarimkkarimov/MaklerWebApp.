@@ -1,7 +1,9 @@
 using MaklerWebApp.API.Middleware;
 using MaklerWebApp.API.Services;
+using MaklerWebApp.API.Authorization;
 using MaklerWebApp.BLL.Extensions;
 using MaklerWebApp.BLL.Models;
+using MaklerWebApp.DAL.Constants;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Extensions;
 using MaklerWebApp.DAL.Localization;
@@ -68,8 +70,19 @@ public class Program
         builder.Services.AddDataAccess(builder.Configuration);
         builder.Services.AddBusinessLayer();
 
-        builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
-        var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+        var jwtSection = builder.Configuration.GetSection("Jwt");
+        builder.Services.Configure<JwtOptions>(jwtSection);
+        var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+
+        if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey))
+        {
+            throw new InvalidOperationException("JWT secret key is missing. Configure it via secure config (User Secrets or environment variable Jwt__SecretKey).");
+        }
+
+        if (Encoding.UTF8.GetByteCount(jwtOptions.SecretKey) < 32)
+        {
+            throw new InvalidOperationException("JWT secret key is too short. Use at least 32 bytes.");
+        }
 
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -88,7 +101,14 @@ public class Program
                 };
             });
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy(AuthorizationPolicies.ListingsModeration, policy =>
+                policy.RequireRole(UserRoles.Admin, UserRoles.Moderator));
+
+            options.AddPolicy(AuthorizationPolicies.ListingsFeatureManagement, policy =>
+                policy.RequireRole(UserRoles.Admin));
+        });
         builder.Services.AddHealthChecks().AddDbContextCheck<MaklerDbContext>();
 
         builder.Services.AddEndpointsApiExplorer();

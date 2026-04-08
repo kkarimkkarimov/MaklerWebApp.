@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IListingService, ListingService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IOtpDeliveryService, OtpDeliveryService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IFavoriteService, FavoriteService>();
         services.AddScoped<IPaymentService, PaymentService>();

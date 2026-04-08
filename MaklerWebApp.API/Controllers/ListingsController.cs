@@ -1,6 +1,7 @@
 using MaklerWebApp.API.Extensions;
 using MaklerWebApp.API.Models;
 using MaklerWebApp.API.Services;
+using MaklerWebApp.API.Authorization;
 using MaklerWebApp.BLL.Models;
 using MaklerWebApp.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -94,7 +95,7 @@ public class ListingsController : ControllerBase
     }
 
     [HttpPatch("{id:int}/moderate")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.ListingsModeration)]
     public async Task<IActionResult> Moderate(int id, [FromBody] ModerateListingRequest request, CancellationToken cancellationToken)
     {
         var updated = await _listingService.ModerateAsync(id, request, cancellationToken);
@@ -102,7 +103,7 @@ public class ListingsController : ControllerBase
     }
 
     [HttpPatch("{id:int}/featured")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.ListingsFeatureManagement)]
     public async Task<IActionResult> SetFeatured(int id, [FromBody] SetFeaturedRequest request, CancellationToken cancellationToken)
     {
         var updated = await _listingService.SetFeaturedAsync(id, request, cancellationToken);

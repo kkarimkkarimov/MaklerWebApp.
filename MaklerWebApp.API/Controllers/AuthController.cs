@@ -41,6 +41,14 @@ public class AuthController : ControllerBase
         return result is null ? Unauthorized(new { message = "Refresh token is invalid or expired." }) : Ok(result);
     }
 
+    [HttpPost("request-otp")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RequestOtp([FromBody] RequestOtpRequest request, CancellationToken cancellationToken)
+    {
+        await _authService.RequestOtpAsync(request, cancellationToken);
+        return Ok(new { message = "If account exists, OTP has been sent." });
+    }
+
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Logout([FromBody] LogoutRequest request, CancellationToken cancellationToken)

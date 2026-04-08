@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>MaklerWebApp-API-8ed3cb6b-31d1-4ea5-9f27-0fe074ca0f71</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

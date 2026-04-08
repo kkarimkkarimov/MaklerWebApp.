@@ -14,6 +14,7 @@ public class MaklerDbContext : DbContext
     public DbSet<ListingImage> ListingImages => Set<ListingImage>();
     public DbSet<ListingTranslation> ListingTranslations => Set<ListingTranslation>();
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<UserOtpCode> UserOtpCodes => Set<UserOtpCode>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<ListingView> ListingViews => Set<ListingView>();
@@ -65,6 +66,19 @@ public class MaklerDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<UserOtpCode>(entity =>
+        {
+            entity.ToTable("UserOtpCodes");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CodeHash).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.CodeSalt).IsRequired().HasMaxLength(256);
+            entity.HasIndex(x => new { x.UserId, x.CreatedAt });
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.OtpCodes)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ListingImage>(entity =>
         {
             entity.ToTable("ListingImages");
@@ -92,6 +106,7 @@ public class MaklerDbContext : DbContext
             entity.Property(x => x.PhoneNumber).HasMaxLength(30);
             entity.Property(x => x.PasswordHash).IsRequired().HasMaxLength(512);
             entity.Property(x => x.PasswordSalt).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.Role).IsRequired().HasMaxLength(32).HasDefaultValue(Constants.UserRoles.User);
             entity.Property(x => x.ProfileImageUrl).HasMaxLength(500);
             entity.HasIndex(x => x.Email).IsUnique();
         });
