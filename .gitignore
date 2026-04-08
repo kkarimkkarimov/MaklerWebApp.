@@ -318,6 +318,15 @@ __pycache__/
 
 # Cake - Uncomment if you are using it
 # tools/**
+
+# Local environment and secret configuration
+.env
+.env.*
+!.env.example
+secrets.json
+**/secrets.json
+appsettings.Local.json
+appsettings.*.local.json
 # !tools/packages.config
 
 # Tabs Studio
