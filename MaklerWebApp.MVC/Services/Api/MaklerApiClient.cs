@@ -55,6 +55,23 @@ public class MaklerApiClient : IMaklerApiClient
                ?? new ApiPagedResult<ApiListingSummary>();
     }
 
+    public async Task<ApiListingDetails?> GetListingByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/listings/{id}", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiListingDetails>(JsonOptions, cancellationToken);
+    }
+
+    public async Task AddListingViewAsync(int id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/listings/{id}/views", content: null, cancellationToken);
+        _ = response.IsSuccessStatusCode;
+    }
+
     public async Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/login", request, cancellationToken);

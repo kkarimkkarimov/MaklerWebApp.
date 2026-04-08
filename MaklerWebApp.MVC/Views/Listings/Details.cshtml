@@ -1,0 +1,77 @@
+@model ListingDetailsViewModel
+
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<section class="mb-4">
+    <a asp-controller="Listings" asp-action="Index" class="text-decoration-none">&larr; Elanlara qayıt</a>
+</section>
+
+<div class="row g-4">
+    <section class="col-12 col-lg-8">
+        <div class="details-gallery mb-3">
+            <img src="@Model.ImageUrls[0]" alt="@Model.Title" class="details-main-image" />
+        </div>
+
+        @if (Model.ImageUrls.Count > 1)
+        {
+            <div class="details-thumbs mb-4">
+                @foreach (var image in Model.ImageUrls.Skip(1).Take(4))
+                {
+                    <img src="@image" alt="@Model.Title" class="details-thumb" loading="lazy" />
+                }
+            </div>
+        }
+
+        <article class="filter-panel">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <h1 class="hero-title fs-2 mb-1">@Model.Title</h1>
+                    <p class="text-muted mb-0">@Model.City, @Model.District</p>
+                </div>
+                @if (Model.IsFeatured)
+                {
+                    <span class="listing-badge position-static">Featured</span>
+                }
+            </div>
+
+            <p class="listing-card-price fs-4">@Model.Price.ToString("N0") @Model.Currency</p>
+
+            <div class="details-meta-grid mt-3 mb-4">
+                <div class="stat-card"><p class="stat-label mb-1">Otaq</p><p class="stat-value">@Model.Rooms</p></div>
+                <div class="stat-card"><p class="stat-label mb-1">Sahə</p><p class="stat-value">@Model.Area m²</p></div>
+                <div class="stat-card"><p class="stat-label mb-1">Baxış</p><p class="stat-value">@Model.ViewCount</p></div>
+                <div class="stat-card"><p class="stat-label mb-1">Tarix</p><p class="stat-value">@Model.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")</p></div>
+            </div>
+
+            <h2 class="section-title">Təsvir</h2>
+            <p class="mb-0">@Model.Description</p>
+        </article>
+    </section>
+
+    <aside class="col-12 col-lg-4">
+        <div class="filter-panel sticky-lg-top" style="top:1rem;">
+            <h2 class="section-title">Əlaqə</h2>
+            <p class="mb-1"><strong>@Model.ContactName</strong></p>
+            <p class="text-muted">@Model.ContactPhone</p>
+            <p class="mb-0 text-muted">@Model.Address</p>
+            <a href="tel:@Model.ContactPhone" class="btn btn-brand w-100 mt-3">Zəng et</a>
+        </div>
+    </aside>
+</div>
+
+@if (Model.RelatedListings.Count > 0)
+{
+    <section class="mt-5">
+        <h2 class="section-title">Oxşar elanlar</h2>
+        <div class="row g-4">
+            @foreach (var item in Model.RelatedListings)
+            {
+                <div class="col-12 col-md-6 col-xl-4">
+                    <partial name="_ListingCard" model="item" />
+                </div>
+            }
+        </div>
+    </section>
+}

@@ -53,7 +53,7 @@ public class ListingsController : Controller
                 .ThenBy(img => img.SortOrder)
                 .Select(img => img.ImageUrl)
                 .FirstOrDefault() ?? "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80",
-            DetailsUrl = "#"
+            DetailsUrl = Url.Action(nameof(Details), new { id = x.Id }) ?? "#"
         }).ToList();
 
         var vm = new ListingsIndexViewModel
@@ -66,5 +66,92 @@ public class ListingsController : Controller
         };
 
         return View(vm);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Details(int id, CancellationToken cancellationToken)
+    {
+        var listing = await _maklerApiClient.GetListingByIdAsync(id, cancellationToken);
+        if (listing is null)
+        {
+            return NotFound();
+        }
+
+        await _maklerApiClient.AddListingViewAsync(id, cancellationToken);
+
+        var relatedSearchResult = await _maklerApiClient.SearchListingsAsync(new ApiListingSearchRequest
+        {
+            City = listing.City,
+            Page = 1,
+            PageSize = 4,
+            SortBy = "published",
+            Descending = true
+        }, cancellationToken);
+
+        var related = relatedSearchResult.Items
+            .Where(x => x.Id != listing.Id)
+            .Take(3)
+            .Select(x => new ListingCardViewModel
+            {
+                Id = x.Id,
+                Title = string.IsNullOrWhiteSpace(x.DisplayTitle) ? "Elan" : x.DisplayTitle,
+                Location = string.IsNullOrWhiteSpace(x.District) ? x.City : $"{x.City}, {x.District}",
+                Price = x.Price,
+                Rooms = x.Rooms,
+                Area = x.Area,
+                IsFeatured = x.IsFeatured,
+                ImageUrl = x.Images
+                    .OrderByDescending(img => img.IsPrimary)
+                    .ThenBy(img => img.SortOrder)
+                    .Select(img => img.ImageUrl)
+                    .FirstOrDefault() ?? "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80",
+                DetailsUrl = Url.Action(nameof(Details), new { id = x.Id }) ?? "#"
+            })
+            .ToList();
+
+        var imageUrls = listing.Images
+            .OrderByDescending(x => x.IsPrimary)
+            .ThenBy(x => x.SortOrder)
+            .Select(x => x.ImageUrl)
+            .ToList();
+
+        if (imageUrls.Count == 0)
+        {
+            imageUrls.Add("https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80");
+        }
+
+        var model = new ListingDetailsViewModel
+        {
+            Id = listing.Id,
+            Title = string.IsNullOrWhiteSpace(listing.DisplayTitle) ? "Elan" : listing.DisplayTitle,
+            Description = listing.DisplayDescription,
+            Price = listing.Price,
+            Currency = GetCurrencyCode(listing.CurrencyType),
+            Rooms = listing.Rooms,
+            Area = listing.Area,
+            City = listing.City,
+            District = listing.District,
+            Address = listing.Address,
+            ContactName = listing.ContactName,
+            ContactPhone = listing.ContactPhone,
+            ViewCount = listing.ViewCount + 1,
+            PublishedAt = listing.PublishedAt,
+            IsFeatured = listing.IsFeatured,
+            ImageUrls = imageUrls,
+            RelatedListings = related
+        };
+
+        return View(model);
+    }
+
+    private static string GetCurrencyCode(int currencyType)
+    {
+        return currencyType switch
+        {
+            1 => "AZN",
+            2 => "USD",
+            3 => "EUR",
+            _ => "AZN"
+        };
     }
 }
