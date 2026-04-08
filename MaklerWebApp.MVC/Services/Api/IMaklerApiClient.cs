@@ -10,6 +10,8 @@ public interface IMaklerApiClient
     Task AddListingViewAsync(int id, CancellationToken cancellationToken = default);
     Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default);
     Task<ApiTokenResponse?> RegisterAsync(ApiRegisterRequest request, CancellationToken cancellationToken = default);
+    Task<ApiTokenResponse?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default);
+    Task LogoutAsync(string refreshToken, CancellationToken cancellationToken = default);
     Task<bool> RequestOtpAsync(string emailOrPhone, CancellationToken cancellationToken = default);
     Task<bool> VerifyOtpAsync(ApiVerifyOtpRequest request, CancellationToken cancellationToken = default);
     Task<int?> GetPublicListingCountAsync(CancellationToken cancellationToken = default);

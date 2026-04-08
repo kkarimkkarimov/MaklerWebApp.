@@ -154,7 +154,30 @@ public class AccountController : Controller
             return RedirectToAction(nameof(Login));
         }
 
-        var paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
+        IReadOnlyList<ApiPaymentHistoryItem> paymentHistory;
+        try
+        {
+            paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            var refreshed = await TryRefreshSessionAsync(cancellationToken);
+            if (!refreshed)
+            {
+                await SignOutAsync(cancellationToken);
+                return RedirectToAction(nameof(Login));
+            }
+
+            accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                await SignOutAsync(cancellationToken);
+                return RedirectToAction(nameof(Login));
+            }
+
+            paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
+        }
+
         return View(new CabinetViewModel
         {
             PaymentHistory = paymentHistory
@@ -164,9 +187,9 @@ public class AccountController : Controller
     [HttpPost]
     [Authorize]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
-        await SignOutAsync();
+        await SignOutAsync(cancellationToken);
         return RedirectToAction(nameof(Login));
     }
 
@@ -189,11 +212,35 @@ public class AccountController : Controller
         HttpContext.Session.SetString(AuthSessionKeys.RefreshToken, tokenResponse.RefreshToken);
     }
 
-    private async Task SignOutAsync()
+    private async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
+        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken);
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            await _maklerApiClient.LogoutAsync(refreshToken, cancellationToken);
+        }
+
         HttpContext.Session.Remove(AuthSessionKeys.AccessToken);
         HttpContext.Session.Remove(AuthSessionKeys.RefreshToken);
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    }
+
+    private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
+    {
+        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return false;
+        }
+
+        var refreshed = await _maklerApiClient.RefreshAsync(refreshToken, cancellationToken);
+        if (refreshed is null)
+        {
+            return false;
+        }
+
+        await SignInAsync(refreshed, isPersistent: true);
+        return true;
     }
 
     private static IReadOnlyList<Claim> ReadClaims(string jwt)

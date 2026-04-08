@@ -83,6 +83,31 @@ public class MaklerApiClient : IMaklerApiClient
         return await response.Content.ReadFromJsonAsync<ApiTokenResponse>(JsonOptions, cancellationToken);
     }
 
+    public async Task<ApiTokenResponse?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/auth/refresh", new ApiRefreshTokenRequest
+        {
+            RefreshToken = refreshToken
+        }, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiTokenResponse>(JsonOptions, cancellationToken);
+    }
+
+    public async Task LogoutAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/auth/logout", new ApiLogoutRequest
+        {
+            RefreshToken = refreshToken
+        }, cancellationToken);
+
+        _ = response.IsSuccessStatusCode;
+    }
+
     public async Task<ApiTokenResponse?> RegisterAsync(ApiRegisterRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/register", request, cancellationToken);
@@ -130,6 +155,11 @@ public class MaklerApiClient : IMaklerApiClient
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             return Array.Empty<ApiPaymentHistoryItem>();
