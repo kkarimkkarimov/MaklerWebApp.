@@ -184,6 +184,53 @@ public class AccountController : Controller
         });
     }
 
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> MyListings(int page = 1, int pageSize = 12, CancellationToken cancellationToken = default)
+    {
+        if (page <= 0)
+        {
+            page = 1;
+        }
+
+        if (pageSize <= 0 || pageSize > 24)
+        {
+            pageSize = 12;
+        }
+
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var apiResult = await ExecuteWithRefreshAsync(
+            (token, ct) => _maklerApiClient.GetMyListingsAsync(token, page, pageSize, ct),
+            accessToken,
+            cancellationToken);
+
+        if (apiResult is null)
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var items = apiResult.Items
+            .Select(x => ToDashboardItem(x, Url.Action("Details", "Listings", new { id = x.Id }) ?? "#"))
+            .ToList();
+
+        var vm = new MyListingsViewModel
+        {
+            Items = items,
+            TotalCount = apiResult.TotalCount,
+            Page = apiResult.Page,
+            PageSize = apiResult.PageSize
+        };
+
+        return View(vm);
+    }
+
     [HttpPost]
     [Authorize]
     [ValidateAntiForgeryToken]

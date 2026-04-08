@@ -1,6 +1,8 @@
 using MaklerWebApp.MVC.Models;
 using MaklerWebApp.MVC.Services.Api;
 using MaklerWebApp.MVC.Services.Api.Contracts;
+using MaklerWebApp.MVC.Infrastructure;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaklerWebApp.MVC.Controllers;
@@ -29,14 +31,14 @@ public class ListingsController : Controller
 
         var apiResult = await _maklerApiClient.SearchListingsAsync(new ApiListingSearchRequest
         {
-            Keyword = filters.Keyword,
-            City = filters.City,
-            MinPrice = filters.MinPrice,
-            MaxPrice = filters.MaxPrice,
+            Keyword = null,
+            City = null,
+            MinPrice = null,
+            MaxPrice = null,
             Page = filters.Page,
             PageSize = filters.PageSize,
-            SortBy = filters.SortBy,
-            Descending = filters.Descending
+            SortBy = "published",
+            Descending = true
         }, cancellationToken);
 
         var cards = apiResult.Items.Select(x => new ListingCardViewModel
@@ -58,7 +60,13 @@ public class ListingsController : Controller
 
         var vm = new ListingsIndexViewModel
         {
-            Filters = filters,
+            Filters = new ListingSearchViewModel
+            {
+                Page = apiResult.Page,
+                PageSize = apiResult.PageSize,
+                SortBy = "published",
+                Descending = true
+            },
             Items = cards,
             TotalCount = apiResult.TotalCount,
             Page = apiResult.Page,
@@ -142,6 +150,123 @@ public class ListingsController : Controller
         };
 
         return View(model);
+    }
+
+    [HttpGet]
+    [Authorize]
+    public IActionResult Create()
+    {
+        return View(new CreateListingViewModel());
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadImages(List<IFormFile> files, CancellationToken cancellationToken)
+    {
+        if (files.Count == 0)
+        {
+            return BadRequest(new { message = "Ən azı bir şəkil seçin." });
+        }
+
+        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return Unauthorized(new { message = "Sessiya bitib. Yenidən daxil olun." });
+        }
+
+        try
+        {
+            var uploadedUrls = await _maklerApiClient.UploadListingImagesAsync(accessToken, files.Take(2).ToList(), cancellationToken);
+            if (uploadedUrls.Count == 0)
+            {
+                return BadRequest(new { message = "Şəkillər yüklənmədi. Yenidən cəhd edin." });
+            }
+
+            return Ok(new { imageUrls = uploadedUrls });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized(new { message = "Sessiya bitib. Yenidən daxil olun." });
+        }
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(CreateListingViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(Create)) });
+        }
+
+        var images = new List<ApiCreateListingImageInput>();
+        if (!string.IsNullOrWhiteSpace(model.PrimaryImageUrl))
+        {
+            images.Add(new ApiCreateListingImageInput { ImageUrl = model.PrimaryImageUrl.Trim(), IsPrimary = true, SortOrder = 0 });
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.SecondaryImageUrl))
+        {
+            images.Add(new ApiCreateListingImageInput { ImageUrl = model.SecondaryImageUrl.Trim(), IsPrimary = images.Count == 0, SortOrder = 1 });
+        }
+
+        try
+        {
+            var created = await _maklerApiClient.CreateListingAsync(accessToken, new ApiCreateListingRequest
+            {
+                Title = model.Title.Trim(),
+                Description = model.Description.Trim(),
+                Price = model.Price,
+                CurrencyType = model.CurrencyType,
+                Area = model.Area,
+                Rooms = model.Rooms,
+                Floor = model.Floor,
+                TotalFloors = model.TotalFloors,
+                PropertyType = model.PropertyType,
+                ListingType = model.ListingType,
+                City = model.City.Trim(),
+                District = model.District.Trim(),
+                Address = model.Address.Trim(),
+                IsNewBuilding = model.IsNewBuilding,
+                HasMortgage = model.HasMortgage,
+                IsMortgageEligible = model.IsMortgageEligible,
+                IsFurnished = model.IsFurnished,
+                RepairStatus = model.RepairStatus,
+                DocumentStatus = model.DocumentStatus,
+                ContactName = model.ContactName.Trim(),
+                ContactPhone = model.ContactPhone.Trim(),
+                Images = images,
+                Translations =
+                [
+                    new ApiCreateListingTranslationInput
+                    {
+                        LanguageCode = "az",
+                        Title = model.Title.Trim(),
+                        Description = model.Description.Trim()
+                    }
+                ]
+            }, cancellationToken);
+
+            if (created is null)
+            {
+                ModelState.AddModelError(string.Empty, "Elan yaradılmadı. Məlumatları yoxlayıb yenidən cəhd edin.");
+                return View(model);
+            }
+
+            return RedirectToAction(nameof(Details), new { id = created.Id });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(Create)) });
+        }
     }
 
     private static string GetCurrencyCode(int currencyType)

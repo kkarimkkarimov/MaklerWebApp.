@@ -13,7 +13,7 @@ public class CreateListingRequest
     [StringLength(4000, MinimumLength = 10)]
     public string Description { get; set; } = string.Empty;
 
-    [Range(typeof(decimal), "0.01", "999999999")]
+    [Range(typeof(decimal), "0.01", "999999999", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
     public decimal Price { get; set; }
     public CurrencyType CurrencyType { get; set; }
 

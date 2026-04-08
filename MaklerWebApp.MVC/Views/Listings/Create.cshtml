@@ -1,0 +1,335 @@
+@model CreateListingViewModel
+
+@{
+    ViewData["Title"] = "Elan yerləşdir";
+}
+
+<section class="mb-4">
+    <h1 class="hero-title fs-2 mb-1">Yeni elan</h1>
+    <p class="hero-subtitle mb-0">Elanınızı mərhələli şəkildə əlavə edin. Minimum vaxt, maksimum keyfiyyət.</p>
+</section>
+
+<section class="create-wizard filter-panel">
+    <div class="create-wizard-steps mb-4">
+        <div class="create-step is-active" data-step-indicator="1">1. Elan tipi</div>
+        <div class="create-step" data-step-indicator="2">2. Əmlak növü</div>
+        <div class="create-step" data-step-indicator="3">3. Məlumatlar</div>
+    </div>
+
+    <form asp-action="Create" method="post" novalidate id="createListingForm">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+        <input asp-for="ListingType" type="hidden" id="listingTypeInput" />
+        <input asp-for="PropertyType" type="hidden" id="propertyTypeInput" />
+
+        <div class="wizard-step-panel is-active" data-step-panel="1">
+            <h2 class="section-title">Elan tipi</h2>
+            <div class="listing-type-switch mb-3">
+                <button type="button" class="type-option is-active" data-listing-type="1">Satıram</button>
+                <button type="button" class="type-option" data-listing-type="2">Kirayə verirəm</button>
+                <button type="button" class="type-option" data-listing-type="3">Günlük kirayə</button>
+            </div>
+            <p class="text-muted mb-0">Davam etmək üçün elan tipini seçin.</p>
+        </div>
+
+        <div class="wizard-step-panel" data-step-panel="2">
+            <h2 class="section-title">Əmlakın növü</h2>
+            <div class="property-type-grid">
+                <button type="button" class="property-card is-selected" data-property-type="1"><span>Mənzil</span></button>
+                <button type="button" class="property-card" data-property-type="2"><span>Ev</span></button>
+                <button type="button" class="property-card" data-property-type="3"><span>Villa</span></button>
+                <button type="button" class="property-card" data-property-type="4"><span>Ofis</span></button>
+                <button type="button" class="property-card" data-property-type="5"><span>Torpaq</span></button>
+                <button type="button" class="property-card" data-property-type="6"><span>Obyekt</span></button>
+            </div>
+        </div>
+
+        <div class="wizard-step-panel" data-step-panel="3">
+            <h2 class="section-title">Elan məlumatları</h2>
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label asp-for="Title" class="form-label">Başlıq *</label>
+                    <input asp-for="Title" class="form-control" placeholder="Məs: Nərimanovda 3 otaqlı yeni tikili" />
+                    <span asp-validation-for="Title" class="text-danger"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label">Təsvir *</label>
+                    <textarea asp-for="Description" class="form-control" rows="5" placeholder="Əmlak haqqında ətraflı məlumat yazın"></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="Price" class="form-label">Qiymət *</label>
+                    <input asp-for="Price" class="form-control" />
+                    <span asp-validation-for="Price" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="CurrencyType" class="form-label">Valyuta</label>
+                    <select asp-for="CurrencyType" class="form-select">
+                        <option value="1">AZN</option>
+                        <option value="2">USD</option>
+                        <option value="3">EUR</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Area" class="form-label">Sahə (m²) *</label>
+                    <input asp-for="Area" class="form-control" />
+                    <span asp-validation-for="Area" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-3">
+                    <label asp-for="Rooms" class="form-label">Otaq sayı *</label>
+                    <input asp-for="Rooms" class="form-control" />
+                    <span asp-validation-for="Rooms" class="text-danger"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Floor" class="form-label">Mərtəbə</label>
+                    <input asp-for="Floor" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="TotalFloors" class="form-label">Mərtəbə sayı</label>
+                    <input asp-for="TotalFloors" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="RepairStatus" class="form-label">Təmir</label>
+                    <select asp-for="RepairStatus" class="form-select">
+                        <option value="1">Təmirsiz</option>
+                        <option value="2">Kosmetik</option>
+                        <option value="3">Yaxşı</option>
+                        <option value="4">Əla</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="DocumentStatus" class="form-label">Sənəd</label>
+                    <select asp-for="DocumentStatus" class="form-select">
+                        <option value="1">Sənədsiz</option>
+                        <option value="2">Müqavilə</option>
+                        <option value="3">Çıxarış</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="City" class="form-label">Şəhər *</label>
+                    <input asp-for="City" class="form-control" />
+                    <span asp-validation-for="City" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="District" class="form-label">Rayon *</label>
+                    <input asp-for="District" class="form-control" />
+                    <span asp-validation-for="District" class="text-danger"></span>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Address" class="form-label">Ünvan *</label>
+                    <input asp-for="Address" class="form-control" />
+                    <span asp-validation-for="Address" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="ContactName" class="form-label">Əlaqə adı *</label>
+                    <input asp-for="ContactName" class="form-control" />
+                    <span asp-validation-for="ContactName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="ContactPhone" class="form-label">Əlaqə nömrəsi *</label>
+                    <input asp-for="ContactPhone" class="form-control" />
+                    <span asp-validation-for="ContactPhone" class="text-danger"></span>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Şəkillər</label>
+                    <div id="imageUploadArea" class="border border-2 rounded-3 p-4 text-center bg-light" style="cursor:pointer;">
+                        <input type="file" id="imageUploadInput" accept="image/*" multiple class="d-none" />
+                        <div class="fw-semibold">Şəkil yükləmək üçün klikləyin</div>
+                        <div class="small text-muted">JPG, PNG, WEBP (maksimum 2 şəkil)</div>
+                    </div>
+                    <div id="imageUploadStatus" class="small text-muted mt-2"></div>
+                    <div id="imagePreviewList" class="row g-2 mt-1"></div>
+                </div>
+
+                <div class="col-md-6">
+                    <label asp-for="PrimaryImageUrl" class="form-label">Əsas şəkil URL</label>
+                    <input asp-for="PrimaryImageUrl" class="form-control" readonly />
+                    <span asp-validation-for="PrimaryImageUrl" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SecondaryImageUrl" class="form-label">Əlavə şəkil URL</label>
+                    <input asp-for="SecondaryImageUrl" class="form-control" readonly />
+                    <span asp-validation-for="SecondaryImageUrl" class="text-danger"></span>
+                </div>
+
+                <div class="col-12 d-flex flex-wrap gap-3 mt-1">
+                    <div class="form-check">
+                        <input asp-for="IsNewBuilding" class="form-check-input" />
+                        <label asp-for="IsNewBuilding" class="form-check-label">Yeni tikili</label>
+                    </div>
+                    <div class="form-check">
+                        <input asp-for="HasMortgage" class="form-check-input" />
+                        <label asp-for="HasMortgage" class="form-check-label">İpoteka var</label>
+                    </div>
+                    <div class="form-check">
+                        <input asp-for="IsMortgageEligible" class="form-check-input" />
+                        <label asp-for="IsMortgageEligible" class="form-check-label">İpotekaya yararlı</label>
+                    </div>
+                    <div class="form-check">
+                        <input asp-for="IsFurnished" class="form-check-input" />
+                        <label asp-for="IsFurnished" class="form-check-label">Mebelli</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="wizard-actions mt-4">
+            <button type="button" class="btn btn-outline-secondary" id="wizardPrevBtn" disabled>Geri</button>
+            <button type="button" class="btn btn-brand" id="wizardNextBtn">Davam et</button>
+            <button type="submit" class="btn btn-brand d-none" id="wizardSubmitBtn">Elanı göndər</button>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const panels = Array.from(document.querySelectorAll('[data-step-panel]'));
+            const indicators = Array.from(document.querySelectorAll('[data-step-indicator]'));
+            const prevBtn = document.getElementById('wizardPrevBtn');
+            const nextBtn = document.getElementById('wizardNextBtn');
+            const submitBtn = document.getElementById('wizardSubmitBtn');
+            const listingTypeInput = document.getElementById('listingTypeInput');
+            const propertyTypeInput = document.getElementById('propertyTypeInput');
+            const imageUploadArea = document.getElementById('imageUploadArea');
+            const imageUploadInput = document.getElementById('imageUploadInput');
+            const imageUploadStatus = document.getElementById('imageUploadStatus');
+            const imagePreviewList = document.getElementById('imagePreviewList');
+            const primaryImageUrlInput = document.getElementById('PrimaryImageUrl');
+            const secondaryImageUrlInput = document.getElementById('SecondaryImageUrl');
+            const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+            let currentStep = 1;
+            const lastStep = panels.length;
+
+            function setStep(step) {
+                currentStep = Math.max(1, Math.min(lastStep, step));
+
+                panels.forEach(panel => panel.classList.toggle('is-active', Number(panel.dataset.stepPanel) === currentStep));
+                indicators.forEach(indicator => indicator.classList.toggle('is-active', Number(indicator.dataset.stepIndicator) === currentStep));
+
+                prevBtn.disabled = currentStep === 1;
+                nextBtn.classList.toggle('d-none', currentStep === lastStep);
+                submitBtn.classList.toggle('d-none', currentStep !== lastStep);
+            }
+
+            nextBtn?.addEventListener('click', () => setStep(currentStep + 1));
+            prevBtn?.addEventListener('click', () => setStep(currentStep - 1));
+
+            document.querySelectorAll('[data-listing-type]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-listing-type]').forEach(x => x.classList.remove('is-active'));
+                    btn.classList.add('is-active');
+                    listingTypeInput.value = btn.dataset.listingType;
+                });
+            });
+
+            document.querySelectorAll('[data-property-type]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-property-type]').forEach(x => x.classList.remove('is-selected'));
+                    btn.classList.add('is-selected');
+                    propertyTypeInput.value = btn.dataset.propertyType;
+                });
+            });
+
+            function renderImagePreviews(urls) {
+                imagePreviewList.innerHTML = '';
+
+                urls.forEach((url, index) => {
+                    const col = document.createElement('div');
+                    col.className = 'col-6 col-md-3';
+
+                    const card = document.createElement('div');
+                    card.className = 'border rounded-3 overflow-hidden bg-white';
+
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = index === 0 ? 'Əsas şəkil' : 'Əlavə şəkil';
+                    img.className = 'w-100';
+                    img.style.height = '120px';
+                    img.style.objectFit = 'cover';
+
+                    card.appendChild(img);
+                    col.appendChild(card);
+                    imagePreviewList.appendChild(col);
+                });
+            }
+
+            async function uploadImages(files) {
+                const selected = Array.from(files || []).slice(0, 2);
+                if (!selected.length || !antiforgeryToken) {
+                    return;
+                }
+
+                const formData = new FormData();
+                selected.forEach(file => formData.append('files', file));
+
+                imageUploadStatus.textContent = 'Şəkillər yüklənir...';
+
+                try {
+                    const response = await fetch('@Url.Action("UploadImages", "Listings")', {
+                        method: 'POST',
+                        headers: {
+                            RequestVerificationToken: antiforgeryToken
+                        },
+                        body: formData
+                    });
+
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        imageUploadStatus.textContent = payload.message || 'Şəkil yüklənmədi.';
+                        return;
+                    }
+
+                    const uploadedUrls = (payload.imageUrls || []).slice(0, 2);
+                    primaryImageUrlInput.value = uploadedUrls[0] || '';
+                    secondaryImageUrlInput.value = uploadedUrls[1] || '';
+
+                    renderImagePreviews(uploadedUrls);
+                    imageUploadStatus.textContent = `${uploadedUrls.length} şəkil uğurla yükləndi.`;
+                } catch {
+                    imageUploadStatus.textContent = 'Yükləmə zamanı xəta baş verdi.';
+                }
+            }
+
+            imageUploadArea?.addEventListener('click', () => imageUploadInput?.click());
+            imageUploadInput?.addEventListener('change', (event) => {
+                uploadImages(event.target.files);
+            });
+
+            imageUploadArea?.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                imageUploadArea.classList.add('border-primary');
+            });
+
+            imageUploadArea?.addEventListener('dragleave', () => {
+                imageUploadArea.classList.remove('border-primary');
+            });
+
+            imageUploadArea?.addEventListener('drop', (event) => {
+                event.preventDefault();
+                imageUploadArea.classList.remove('border-primary');
+                uploadImages(event.dataTransfer?.files);
+            });
+
+            if (!listingTypeInput.value) {
+                listingTypeInput.value = '1';
+            }
+            if (!propertyTypeInput.value) {
+                propertyTypeInput.value = '1';
+            }
+
+            setStep(1);
+        })();
+    </script>
+}

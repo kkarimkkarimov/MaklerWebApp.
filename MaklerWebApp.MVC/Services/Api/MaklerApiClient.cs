@@ -1,4 +1,5 @@
 using MaklerWebApp.MVC.Services.Api.Contracts;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,6 +10,10 @@ namespace MaklerWebApp.MVC.Services.Api;
 public class MaklerApiClient : IMaklerApiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private sealed class UploadImagesResponse
+    {
+        public List<string> ImageUrls { get; set; } = new();
+    }
 
     private readonly HttpClient _httpClient;
 
@@ -53,7 +58,7 @@ public class MaklerApiClient : IMaklerApiClient
                 return new ApiPagedResult<ApiListingSummary>();
             }
 
-            return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(cancellationToken: cancellationToken)
+            return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(JsonOptions, cancellationToken)
                    ?? new ApiPagedResult<ApiListingSummary>();
         }
         catch
@@ -80,6 +85,28 @@ public class MaklerApiClient : IMaklerApiClient
 
         return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(JsonOptions, cancellationToken)
                ?? new ApiPagedResult<ApiListingSummary>();
+    }
+
+    public async Task<ApiListingSummary?> CreateListingAsync(string accessToken, ApiCreateListingRequest request, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "api/listings")
+        {
+            Content = JsonContent.Create(request)
+        };
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiListingSummary>(JsonOptions, cancellationToken);
     }
 
     public async Task<ApiListingDetails?> GetListingByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -214,5 +241,60 @@ public class MaklerApiClient : IMaklerApiClient
 
         var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiPaymentHistoryItem>>(JsonOptions, cancellationToken);
         return result ?? Array.Empty<ApiPaymentHistoryItem>();
+    }
+
+    public async Task<IReadOnlyList<string>> UploadListingImagesAsync(string accessToken, IReadOnlyList<IFormFile> files, CancellationToken cancellationToken = default)
+    {
+        if (files.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        using var content = new MultipartFormDataContent();
+        foreach (var file in files.Where(x => x is { Length: > 0 }))
+        {
+            var streamContent = new StreamContent(file.OpenReadStream());
+            if (!string.IsNullOrWhiteSpace(file.ContentType))
+            {
+                streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse(file.ContentType);
+            }
+
+            content.Add(streamContent, "files", file.FileName);
+        }
+
+        if (!content.Any())
+        {
+            return Array.Empty<string>();
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/listings/images/upload")
+        {
+            Content = content
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Array.Empty<string>();
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<UploadImagesResponse>(JsonOptions, cancellationToken);
+        if (payload is null || payload.ImageUrls.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        return payload.ImageUrls
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Select(url => Uri.TryCreate(url, UriKind.Absolute, out _)
+                ? url
+                : new Uri(_httpClient.BaseAddress!, url).ToString())
+            .ToArray();
     }
 }

@@ -21,6 +21,7 @@ public class ListingRepository : IListingRepository
             .AsNoTracking()
             .Include(x => x.Images)
             .Include(x => x.Translations)
+            .AsSplitQuery()
             .AsQueryable();
 
         if (!criteria.IncludeDeleted)
