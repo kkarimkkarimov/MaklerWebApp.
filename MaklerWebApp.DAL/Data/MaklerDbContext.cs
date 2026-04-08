@@ -1,4 +1,5 @@
 using MaklerWebApp.DAL.Entities;
+using MaklerWebApp.DAL.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace MaklerWebApp.DAL.Data;
@@ -36,6 +37,9 @@ public class MaklerDbContext : DbContext
             entity.Property(x => x.ContactName).IsRequired().HasMaxLength(120);
             entity.Property(x => x.ContactPhone).IsRequired().HasMaxLength(30);
             entity.Property(x => x.ModerationNote).HasMaxLength(500);
+            entity.Property(x => x.RepairStatus).HasDefaultValue(RepairStatus.NoRepair);
+            entity.Property(x => x.DocumentStatus).HasDefaultValue(DocumentStatus.NoDocument);
+            entity.Property(x => x.IsMortgageEligible).HasDefaultValue(false);
 
             entity.HasIndex(x => new { x.City, x.District });
             entity.HasIndex(x => new { x.ListingType, x.PropertyType });

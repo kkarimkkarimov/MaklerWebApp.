@@ -23,8 +23,8 @@ public class Listing
     public bool HasMortgage { get; set; }
     public bool IsMortgageEligible { get; set; }
     public bool IsFurnished { get; set; }
-    public RepairStatus RepairStatus { get; set; }
-    public DocumentStatus DocumentStatus { get; set; }
+    public RepairStatus RepairStatus { get; set; } = RepairStatus.NoRepair;
+    public DocumentStatus DocumentStatus { get; set; } = DocumentStatus.NoDocument;
     public string ContactName { get; set; } = string.Empty;
     public string ContactPhone { get; set; } = string.Empty;
     public ListingStatus Status { get; set; } = ListingStatus.Pending;

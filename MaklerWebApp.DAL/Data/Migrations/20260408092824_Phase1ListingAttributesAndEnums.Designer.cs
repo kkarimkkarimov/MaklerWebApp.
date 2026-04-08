@@ -4,6 +4,7 @@ using MaklerWebApp.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MaklerWebApp.DAL.Data.Migrations
 {
     [DbContext(typeof(MaklerDbContext))]
-    partial class MaklerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260408092824_Phase1ListingAttributesAndEnums")]
+    partial class Phase1ListingAttributesAndEnums
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -153,9 +156,7 @@ namespace MaklerWebApp.DAL.Data.Migrations
                         .HasColumnType("nvarchar(80)");
 
                     b.Property<int>("DocumentStatus")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("FeaturedUntil")
                         .HasColumnType("datetime2");
@@ -176,9 +177,7 @@ namespace MaklerWebApp.DAL.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsMortgageEligible")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsNewBuilding")
                         .HasColumnType("bit");
@@ -207,9 +206,7 @@ namespace MaklerWebApp.DAL.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("RepairStatus")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
 
                     b.Property<int>("Rooms")
                         .HasColumnType("int");
