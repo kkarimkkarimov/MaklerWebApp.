@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="MaklerWebApp.API/MaklerWebApp.API.csproj" />
+  <Project Path="MaklerWebApp.BLL/MaklerWebApp.BLL.csproj" />
+  <Project Path="MaklerWebApp.DAL/MaklerWebApp.DAL.csproj" />
+  <Project Path="MaklerWebApp.MVC/MaklerWebApp.MVC.csproj" />
+</Solution>
