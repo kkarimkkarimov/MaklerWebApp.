@@ -71,7 +71,7 @@ public class Program
         });
 
         builder.Services.AddDataAccess(builder.Configuration);
-        builder.Services.AddBusinessLayer();
+        builder.Services.AddBusinessLayer(builder.Configuration);
 
         var jwtSection = builder.Configuration.GetSection("Jwt");
         builder.Services.Configure<JwtOptions>(jwtSection);

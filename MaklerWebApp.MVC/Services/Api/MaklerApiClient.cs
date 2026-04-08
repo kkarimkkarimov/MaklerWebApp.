@@ -32,27 +32,34 @@ public class MaklerApiClient : IMaklerApiClient
 
     public async Task<ApiPagedResult<ApiListingSummary>> SearchListingsAsync(ApiListingSearchRequest request, CancellationToken cancellationToken = default)
     {
-        var queryParams = new Dictionary<string, string?>
+        try
         {
-            ["keyword"] = request.Keyword,
-            ["city"] = request.City,
-            ["minPrice"] = request.MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["maxPrice"] = request.MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["page"] = request.Page.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["pageSize"] = request.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["sortBy"] = request.SortBy,
-            ["descending"] = request.Descending.ToString().ToLowerInvariant()
-        };
+            var queryParams = new Dictionary<string, string?>
+            {
+                ["keyword"] = request.Keyword,
+                ["city"] = request.City,
+                ["minPrice"] = request.MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["maxPrice"] = request.MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["page"] = request.Page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["pageSize"] = request.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["sortBy"] = request.SortBy,
+                ["descending"] = request.Descending.ToString().ToLowerInvariant()
+            };
 
-        var url = QueryHelpers.AddQueryString("api/listings", queryParams!);
-        using var response = await _httpClient.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+            var url = QueryHelpers.AddQueryString("api/listings", queryParams!);
+            using var response = await _httpClient.GetAsync(url, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new ApiPagedResult<ApiListingSummary>();
+            }
+
+            return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(cancellationToken: cancellationToken)
+                   ?? new ApiPagedResult<ApiListingSummary>();
+        }
+        catch
         {
             return new ApiPagedResult<ApiListingSummary>();
         }
-
-        return await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(cancellationToken: cancellationToken)
-               ?? new ApiPagedResult<ApiListingSummary>();
     }
 
     public async Task<ApiPagedResult<ApiListingSummary>> GetMyListingsAsync(string accessToken, int page, int pageSize, CancellationToken cancellationToken = default)
@@ -77,19 +84,32 @@ public class MaklerApiClient : IMaklerApiClient
 
     public async Task<ApiListingDetails?> GetListingByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.GetAsync($"api/listings/{id}", cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
+        {
+            using var response = await _httpClient.GetAsync($"api/listings/{id}", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<ApiListingDetails>(JsonOptions, cancellationToken);
+        }
+        catch
         {
             return null;
         }
-
-        return await response.Content.ReadFromJsonAsync<ApiListingDetails>(JsonOptions, cancellationToken);
     }
 
     public async Task AddListingViewAsync(int id, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PostAsync($"api/listings/{id}/views", content: null, cancellationToken);
-        _ = response.IsSuccessStatusCode;
+        try
+        {
+            using var response = await _httpClient.PostAsync($"api/listings/{id}/views", content: null, cancellationToken);
+            _ = response.IsSuccessStatusCode;
+        }
+        catch
+        {
+        }
     }
 
     public async Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default)
@@ -159,14 +179,21 @@ public class MaklerApiClient : IMaklerApiClient
 
     public async Task<int?> GetPublicListingCountAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.GetAsync("api/listings?page=1&pageSize=1", cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
+        {
+            using var response = await _httpClient.GetAsync("api/listings?page=1&pageSize=1", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(JsonOptions, cancellationToken);
+            return result?.TotalCount;
+        }
+        catch
         {
             return null;
         }
-
-        var result = await response.Content.ReadFromJsonAsync<ApiPagedResult<ApiListingSummary>>(JsonOptions, cancellationToken);
-        return result?.TotalCount;
     }
 
     public async Task<IReadOnlyList<ApiPaymentHistoryItem>> GetPaymentHistoryAsync(string accessToken, CancellationToken cancellationToken = default)
