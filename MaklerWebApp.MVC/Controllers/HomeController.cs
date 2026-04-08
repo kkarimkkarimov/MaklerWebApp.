@@ -1,4 +1,5 @@
 using MaklerWebApp.MVC.Models;
+using MaklerWebApp.MVC.Services.Api;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 
@@ -6,8 +7,16 @@ namespace MaklerWebApp.MVC.Controllers
 {
     public class HomeController : Controller
     {
-        public IActionResult Index()
+        private readonly IMaklerApiClient _maklerApiClient;
+
+        public HomeController(IMaklerApiClient maklerApiClient)
         {
+            _maklerApiClient = maklerApiClient;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            ViewData["ApiHealthy"] = await _maklerApiClient.IsHealthyAsync(HttpContext.RequestAborted);
             return View();
         }
 

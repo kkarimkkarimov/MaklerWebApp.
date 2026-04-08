@@ -1,4 +1,6 @@
 using MaklerWebApp.MVC.Localization;
+using MaklerWebApp.MVC.Options;
+using MaklerWebApp.MVC.Services.Api;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Localization.Routing;
 using Microsoft.Extensions.Options;
@@ -14,6 +16,17 @@ namespace MaklerWebApp.MVC
             // Add services to the container.
             builder.Services.AddControllersWithViews();
             builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+            builder.Services.Configure<ApiClientOptions>(builder.Configuration.GetSection(ApiClientOptions.SectionName));
+            builder.Services.AddHttpClient<IMaklerApiClient, MaklerApiClient>((serviceProvider, httpClient) =>
+            {
+                var options = serviceProvider.GetRequiredService<IOptions<ApiClientOptions>>().Value;
+                if (string.IsNullOrWhiteSpace(options.BaseUrl))
+                {
+                    throw new InvalidOperationException("API base URL is missing. Configure Api:BaseUrl in appsettings or environment variables.");
+                }
+
+                httpClient.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            });
 
             builder.Services.Configure<RequestLocalizationOptions>(options =>
             {
