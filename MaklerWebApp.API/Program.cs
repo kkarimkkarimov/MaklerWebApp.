@@ -1,4 +1,5 @@
 using MaklerWebApp.API.Middleware;
+using MaklerWebApp.API.Models;
 using MaklerWebApp.API.Services;
 using MaklerWebApp.API.Authorization;
 using MaklerWebApp.BLL.Extensions;
@@ -58,11 +59,13 @@ public class Program
                         x => x.Key,
                         x => x.Value!.Errors.Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Invalid value." : e.ErrorMessage).ToArray());
 
-                return new BadRequestObjectResult(new
+                return new BadRequestObjectResult(new ApiErrorResponse
                 {
-                    message = "Validation failed.",
-                    errors,
-                    traceId = context.HttpContext.TraceIdentifier
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Code = "validation_failed",
+                    Message = "Validation failed.",
+                    Errors = errors,
+                    TraceId = context.HttpContext.TraceIdentifier
                 });
             };
         });
