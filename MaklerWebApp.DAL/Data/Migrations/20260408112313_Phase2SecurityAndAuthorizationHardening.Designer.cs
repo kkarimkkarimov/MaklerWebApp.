@@ -4,6 +4,7 @@ using MaklerWebApp.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MaklerWebApp.DAL.Data.Migrations
 {
     [DbContext(typeof(MaklerDbContext))]
-    partial class MaklerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260408112313_Phase2SecurityAndAuthorizationHardening")]
+    partial class Phase2SecurityAndAuthorizationHardening
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
