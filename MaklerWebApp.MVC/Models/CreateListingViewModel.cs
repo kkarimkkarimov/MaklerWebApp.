@@ -59,4 +59,6 @@ public class CreateListingViewModel
     public string? PrimaryImageUrl { get; set; }
 
     public string? SecondaryImageUrl { get; set; }
+
+    public List<string> UploadedImageUrls { get; set; } = new();
 }

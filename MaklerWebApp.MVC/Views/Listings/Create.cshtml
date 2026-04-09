@@ -148,22 +148,15 @@
                     <div id="imageUploadArea" class="border border-2 rounded-3 p-4 text-center bg-light" style="cursor:pointer;">
                         <input type="file" id="imageUploadInput" accept="image/*" multiple class="d-none" />
                         <div class="fw-semibold">Şəkil yükləmək üçün klikləyin</div>
-                        <div class="small text-muted">JPG, PNG, WEBP (maksimum 2 şəkil)</div>
+                        <div class="small text-muted">JPG, PNG, WEBP (kliklədikcə yeni şəkillər əlavə olunur)</div>
                     </div>
                     <div id="imageUploadStatus" class="small text-muted mt-2"></div>
                     <div id="imagePreviewList" class="row g-2 mt-1"></div>
+                    <div id="uploadedImageInputs"></div>
                 </div>
 
-                <div class="col-md-6">
-                    <label asp-for="PrimaryImageUrl" class="form-label">Əsas şəkil URL</label>
-                    <input asp-for="PrimaryImageUrl" class="form-control" readonly />
-                    <span asp-validation-for="PrimaryImageUrl" class="text-danger"></span>
-                </div>
-                <div class="col-md-6">
-                    <label asp-for="SecondaryImageUrl" class="form-label">Əlavə şəkil URL</label>
-                    <input asp-for="SecondaryImageUrl" class="form-control" readonly />
-                    <span asp-validation-for="SecondaryImageUrl" class="text-danger"></span>
-                </div>
+                <input asp-for="PrimaryImageUrl" type="hidden" />
+                <input asp-for="SecondaryImageUrl" type="hidden" />
 
                 <div class="col-12 d-flex flex-wrap gap-3 mt-1">
                     <div class="form-check">
@@ -212,9 +205,11 @@
             const imageUploadInput = document.getElementById('imageUploadInput');
             const imageUploadStatus = document.getElementById('imageUploadStatus');
             const imagePreviewList = document.getElementById('imagePreviewList');
+            const uploadedImageInputs = document.getElementById('uploadedImageInputs');
             const primaryImageUrlInput = document.getElementById('PrimaryImageUrl');
             const secondaryImageUrlInput = document.getElementById('SecondaryImageUrl');
             const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            let uploadedImageUrls = [];
 
             let currentStep = 1;
             const lastStep = panels.length;
@@ -304,7 +299,7 @@
                     col.className = 'col-6 col-md-3';
 
                     const card = document.createElement('div');
-                    card.className = 'border rounded-3 overflow-hidden bg-white';
+                    card.className = 'border rounded-3 overflow-hidden bg-white position-relative';
 
                     const img = document.createElement('img');
                     img.src = url;
@@ -313,14 +308,54 @@
                     img.style.height = '120px';
                     img.style.objectFit = 'cover';
 
+                    if (index === 0) {
+                        const primaryBadge = document.createElement('span');
+                        primaryBadge.className = 'badge bg-primary position-absolute top-0 start-0 m-1';
+                        primaryBadge.textContent = 'Əsas';
+                        card.appendChild(primaryBadge);
+                    }
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'btn btn-sm btn-danger position-absolute top-0 end-0 m-1 rounded-circle';
+                    removeBtn.style.width = '28px';
+                    removeBtn.style.height = '28px';
+                    removeBtn.style.padding = '0';
+                    removeBtn.textContent = '×';
+                    removeBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        uploadedImageUrls.splice(index, 1);
+                        syncImageState();
+                    });
+
                     card.appendChild(img);
+                    card.appendChild(removeBtn);
                     col.appendChild(card);
                     imagePreviewList.appendChild(col);
                 });
             }
 
+            function syncImageState() {
+                uploadedImageInputs.innerHTML = '';
+                uploadedImageUrls.forEach((url, index) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = `UploadedImageUrls[${index}]`;
+                    input.value = url;
+                    uploadedImageInputs.appendChild(input);
+                });
+
+                primaryImageUrlInput.value = uploadedImageUrls[0] || '';
+                secondaryImageUrlInput.value = uploadedImageUrls[1] || '';
+
+                renderImagePreviews(uploadedImageUrls);
+                imageUploadStatus.textContent = uploadedImageUrls.length > 0
+                    ? `${uploadedImageUrls.length} şəkil əlavə edilib.`
+                    : '';
+            }
+
             async function uploadImages(files) {
-                const selected = Array.from(files || []).slice(0, 2);
+                const selected = Array.from(files || []);
                 if (!selected.length || !antiforgeryToken) {
                     return;
                 }
@@ -345,12 +380,20 @@
                         return;
                     }
 
-                    const uploadedUrls = (payload.imageUrls || []).slice(0, 2);
-                    primaryImageUrlInput.value = uploadedUrls[0] || '';
-                    secondaryImageUrlInput.value = uploadedUrls[1] || '';
+                    const uploadedUrls = (payload.imageUrls || []).filter(x => !!x);
+                    if (!uploadedUrls.length) {
+                        imageUploadStatus.textContent = 'Şəkillər yüklənmədi.';
+                        return;
+                    }
 
-                    renderImagePreviews(uploadedUrls);
-                    imageUploadStatus.textContent = `${uploadedUrls.length} şəkil uğurla yükləndi.`;
+                    uploadedUrls.forEach(url => {
+                        if (!uploadedImageUrls.includes(url)) {
+                            uploadedImageUrls.push(url);
+                        }
+                    });
+
+                    syncImageState();
+                    imageUploadStatus.textContent = `${uploadedUrls.length} şəkil uğurla yükləndi. Cəmi: ${uploadedImageUrls.length}`;
                 } catch {
                     imageUploadStatus.textContent = 'Yükləmə zamanı xəta baş verdi.';
                 }
@@ -359,6 +402,7 @@
             imageUploadArea?.addEventListener('click', () => imageUploadInput?.click());
             imageUploadInput?.addEventListener('change', (event) => {
                 uploadImages(event.target.files);
+                imageUploadInput.value = '';
             });
 
             imageUploadArea?.addEventListener('dragover', (event) => {
@@ -382,6 +426,14 @@
             if (!propertyTypeInput.value) {
                 propertyTypeInput.value = '1';
             }
+
+            if (primaryImageUrlInput?.value) {
+                uploadedImageUrls.push(primaryImageUrlInput.value);
+            }
+            if (secondaryImageUrlInput?.value && !uploadedImageUrls.includes(secondaryImageUrlInput.value)) {
+                uploadedImageUrls.push(secondaryImageUrlInput.value);
+            }
+            syncImageState();
 
             if (cityInput) {
                 cityInput.setAttribute('data-selected', '@Model.City');

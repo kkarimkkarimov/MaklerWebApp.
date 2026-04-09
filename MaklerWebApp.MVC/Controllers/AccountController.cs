@@ -26,7 +26,7 @@ public class AccountController : Controller
     {
         if (User.Identity?.IsAuthenticated == true)
         {
-            return RedirectToAction(nameof(Cabinet));
+            return RedirectToAction("Index", "Home");
         }
 
         return View(new LoginViewModel { ReturnUrl = returnUrl });
@@ -77,7 +77,7 @@ public class AccountController : Controller
             return Redirect(model.ReturnUrl);
         }
 
-        return RedirectToAction(nameof(Cabinet));
+        return RedirectToAction("Index", "Home");
     }
 
     [HttpGet]
@@ -86,7 +86,7 @@ public class AccountController : Controller
     {
         if (User.Identity?.IsAuthenticated == true)
         {
-            return RedirectToAction(nameof(Cabinet));
+            return RedirectToAction("Index", "Home");
         }
 
         return View(new RegisterViewModel());
@@ -169,7 +169,7 @@ public class AccountController : Controller
 
         await SignInAsync(tokenResponse, isPersistent: false);
         TempData["SuccessMessage"] = "Hesab uğurla təsdiqləndi.";
-        return RedirectToAction(nameof(Cabinet));
+        return RedirectToAction("Index", "Home");
     }
 
     [HttpPost]
@@ -221,11 +221,8 @@ public class AccountController : Controller
             accessToken,
             cancellationToken);
 
-        if (paymentHistory is null || myListings is null)
-        {
-            await SignOutAsync(cancellationToken);
-            return RedirectToAction(nameof(Login));
-        }
+        paymentHistory ??= new List<ApiPaymentHistoryItem>();
+        myListings ??= new ApiPagedResult<ApiListingSummary>();
 
         var recentListings = (myListings?.Items ?? Array.Empty<ApiListingSummary>())
             .Take(5)
@@ -341,8 +338,14 @@ public class AccountController : Controller
 
         if (apiResult is null)
         {
-            await SignOutAsync(cancellationToken);
-            return RedirectToAction(nameof(Login));
+            TempData["ErrorMessage"] = "Elanlarınız müvəqqəti yüklənmədi. Bir az sonra yenidən cəhd edin.";
+            return View(new MyListingsViewModel
+            {
+                Items = new List<DashboardListingItemViewModel>(),
+                TotalCount = 0,
+                Page = page,
+                PageSize = pageSize
+            });
         }
 
         var items = apiResult.Items

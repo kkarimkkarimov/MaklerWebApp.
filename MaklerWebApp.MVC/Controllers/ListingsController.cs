@@ -372,12 +372,12 @@ public class ListingsController : Controller
         var accessToken = await GetValidAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            return Unauthorized(new { message = "Sessiya bitib. Yenidən daxil olun." });
+            return BadRequest(new { message = "Şəkil yükləmək alınmadı. Yenidən cəhd edin." });
         }
 
         try
         {
-            var uploadedUrls = await _maklerApiClient.UploadListingImagesAsync(accessToken, files.Take(2).ToList(), cancellationToken);
+            var uploadedUrls = await _maklerApiClient.UploadListingImagesAsync(accessToken, files, cancellationToken);
             if (uploadedUrls.Count == 0)
             {
                 return BadRequest(new { message = "Şəkillər yüklənmədi. Yenidən cəhd edin." });
@@ -387,7 +387,27 @@ public class ListingsController : Controller
         }
         catch (UnauthorizedAccessException)
         {
-            return Unauthorized(new { message = "Sessiya bitib. Yenidən daxil olun." });
+            HttpContext.Session.Remove(AuthSessionKeys.AccessToken);
+            var refreshedAccessToken = await GetValidAccessTokenAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(refreshedAccessToken))
+            {
+                return BadRequest(new { message = "Şəkil yükləmək alınmadı. Yenidən cəhd edin." });
+            }
+
+            try
+            {
+                var uploadedUrls = await _maklerApiClient.UploadListingImagesAsync(refreshedAccessToken, files, cancellationToken);
+                if (uploadedUrls.Count == 0)
+                {
+                    return BadRequest(new { message = "Şəkillər yüklənmədi. Yenidən cəhd edin." });
+                }
+
+                return Ok(new { imageUrls = uploadedUrls });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return BadRequest(new { message = "Şəkil yükləmək alınmadı. Yenidən cəhd edin." });
+            }
         }
     }
 
@@ -408,16 +428,33 @@ public class ListingsController : Controller
             return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(Create)) });
         }
 
-        var images = new List<ApiCreateListingImageInput>();
-        if (!string.IsNullOrWhiteSpace(model.PrimaryImageUrl))
+        var imageUrls = model.UploadedImageUrls
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (imageUrls.Count == 0)
         {
-            images.Add(new ApiCreateListingImageInput { ImageUrl = model.PrimaryImageUrl.Trim(), IsPrimary = true, SortOrder = 0 });
+            if (!string.IsNullOrWhiteSpace(model.PrimaryImageUrl))
+            {
+                imageUrls.Add(model.PrimaryImageUrl.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.SecondaryImageUrl))
+            {
+                imageUrls.Add(model.SecondaryImageUrl.Trim());
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(model.SecondaryImageUrl))
-        {
-            images.Add(new ApiCreateListingImageInput { ImageUrl = model.SecondaryImageUrl.Trim(), IsPrimary = images.Count == 0, SortOrder = 1 });
-        }
+        var images = imageUrls
+            .Select((url, index) => new ApiCreateListingImageInput
+            {
+                ImageUrl = url,
+                IsPrimary = index == 0,
+                SortOrder = index
+            })
+            .ToList();
 
         try
         {
