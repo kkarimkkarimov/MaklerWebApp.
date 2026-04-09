@@ -3,12 +3,14 @@ using MaklerWebApp.DAL.Constants;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace MaklerWebApp.BLL.Services;
 
@@ -24,12 +26,21 @@ public class AuthService : IAuthService
     private readonly MaklerDbContext _dbContext;
     private readonly JwtOptions _jwtOptions;
     private readonly IOtpDeliveryService _otpDeliveryService;
+    private readonly IDistributedCache _distributedCache;
 
-    public AuthService(MaklerDbContext dbContext, IOptions<JwtOptions> jwtOptions, IOtpDeliveryService otpDeliveryService)
+    private static readonly JsonSerializerOptions PendingRegistrationJsonOptions = new(JsonSerializerDefaults.Web);
+    private const string PendingRegistrationCachePrefix = "auth:pending-registration:";
+
+    public AuthService(
+        MaklerDbContext dbContext,
+        IOptions<JwtOptions> jwtOptions,
+        IOtpDeliveryService otpDeliveryService,
+        IDistributedCache distributedCache)
     {
         _dbContext = dbContext;
         _jwtOptions = jwtOptions.Value;
         _otpDeliveryService = otpDeliveryService;
+        _distributedCache = distributedCache;
     }
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -44,39 +55,30 @@ public class AuthService : IAuthService
         var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SaltSize));
         var hash = HashPassword(request.Password, salt);
 
-        AppUser user;
-        if (existingUser is null)
+        var code = GenerateOtpCode();
+        var otpSalt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SaltSize));
+        var otpHash = HashOtpCode(code, otpSalt);
+        var pendingRegistration = new PendingRegistrationCacheModel
         {
-            user = new AppUser
-            {
-                FullName = request.FullName.Trim(),
-                Email = email,
-                PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
-                PasswordSalt = salt,
-                PasswordHash = hash,
-                Role = UserRoles.User,
-                IsVerified = false
-            };
+            FullName = request.FullName.Trim(),
+            Email = email,
+            PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
+            PasswordSalt = salt,
+            PasswordHash = hash,
+            OtpCodeSalt = otpSalt,
+            OtpCodeHash = otpHash,
+            FailedAttempts = 0,
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(OtpLifetimeMinutes),
+            CreatedAtUtc = DateTime.UtcNow
+        };
 
-            _dbContext.Users.Add(user);
-        }
-        else
-        {
-            user = existingUser;
-            user.FullName = request.FullName.Trim();
-            user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
-            user.PasswordSalt = salt;
-            user.PasswordHash = hash;
-            user.IsVerified = false;
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await CreateAndSendOtpAsync(user, cancellationToken);
+        await SavePendingRegistrationAsync(pendingRegistration, cancellationToken);
+        await _otpDeliveryService.SendAsync(email, code, cancellationToken);
 
         return new RegisterResponse
         {
             RequiresOtpVerification = true,
-            EmailOrPhone = user.Email,
+            EmailOrPhone = email,
             Message = "OTP kodu e-mail ünvanınıza göndərildi. Kodu təsdiqlədikdən sonra hesab aktiv olacaq."
         };
     }
@@ -87,6 +89,20 @@ public class AuthService : IAuthService
         var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
         if (user is null)
         {
+            var pendingRegistration = await GetPendingRegistrationAsync(email, cancellationToken);
+            if (pendingRegistration is not null)
+            {
+                var code = GenerateOtpCode();
+                pendingRegistration.OtpCodeSalt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SaltSize));
+                pendingRegistration.OtpCodeHash = HashOtpCode(code, pendingRegistration.OtpCodeSalt);
+                pendingRegistration.FailedAttempts = 0;
+                pendingRegistration.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(OtpLifetimeMinutes);
+
+                await SavePendingRegistrationAsync(pendingRegistration, cancellationToken);
+                await _otpDeliveryService.SendAsync(pendingRegistration.Email, code, cancellationToken);
+                throw new UnauthorizedAccessException("Account is pending OTP verification. A new OTP code has been sent.");
+            }
+
             return null;
         }
 
@@ -144,6 +160,21 @@ public class AuthService : IAuthService
 
     public async Task RequestOtpAsync(RequestOtpRequest request, CancellationToken cancellationToken = default)
     {
+        var normalizedEmail = request.EmailOrPhone.Trim().ToLowerInvariant();
+        var pendingRegistration = await GetPendingRegistrationAsync(normalizedEmail, cancellationToken);
+        if (pendingRegistration is not null)
+        {
+            var code = GenerateOtpCode();
+            pendingRegistration.OtpCodeSalt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SaltSize));
+            pendingRegistration.OtpCodeHash = HashOtpCode(code, pendingRegistration.OtpCodeSalt);
+            pendingRegistration.FailedAttempts = 0;
+            pendingRegistration.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(OtpLifetimeMinutes);
+
+            await SavePendingRegistrationAsync(pendingRegistration, cancellationToken);
+            await _otpDeliveryService.SendAsync(pendingRegistration.Email, code, cancellationToken);
+            return;
+        }
+
         var user = await FindUserByEmailOrPhoneAsync(request.EmailOrPhone, cancellationToken);
         if (user is null)
         {
@@ -155,6 +186,66 @@ public class AuthService : IAuthService
 
     public async Task<VerifyOtpResult?> VerifyOtpAsync(VerifyOtpRequest request, CancellationToken cancellationToken = default)
     {
+        var normalizedEmail = request.EmailOrPhone.Trim().ToLowerInvariant();
+        var pendingRegistration = await GetPendingRegistrationAsync(normalizedEmail, cancellationToken);
+        if (pendingRegistration is not null)
+        {
+            if (pendingRegistration.ExpiresAtUtc <= DateTime.UtcNow || pendingRegistration.FailedAttempts >= MaxOtpAttempts)
+            {
+                return null;
+            }
+
+            var pendingCodeMatch = VerifyOtpCode(request.Code, pendingRegistration.OtpCodeSalt, pendingRegistration.OtpCodeHash);
+            if (!pendingCodeMatch)
+            {
+                pendingRegistration.FailedAttempts++;
+                await SavePendingRegistrationAsync(pendingRegistration, cancellationToken);
+                return null;
+            }
+
+            var existingUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
+            if (existingUser is not null && existingUser.IsVerified)
+            {
+                throw new ArgumentException("Email already exists.");
+            }
+
+            AppUser verifiedUser;
+            if (existingUser is null)
+            {
+                verifiedUser = new AppUser
+                {
+                    FullName = pendingRegistration.FullName,
+                    Email = pendingRegistration.Email,
+                    PhoneNumber = pendingRegistration.PhoneNumber,
+                    PasswordSalt = pendingRegistration.PasswordSalt,
+                    PasswordHash = pendingRegistration.PasswordHash,
+                    Role = UserRoles.User,
+                    IsVerified = true
+                };
+
+                _dbContext.Users.Add(verifiedUser);
+            }
+            else
+            {
+                verifiedUser = existingUser;
+                verifiedUser.FullName = pendingRegistration.FullName;
+                verifiedUser.PhoneNumber = pendingRegistration.PhoneNumber;
+                verifiedUser.PasswordSalt = pendingRegistration.PasswordSalt;
+                verifiedUser.PasswordHash = pendingRegistration.PasswordHash;
+                verifiedUser.IsVerified = true;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await RemovePendingRegistrationAsync(normalizedEmail, cancellationToken);
+
+            var pendingToken = await IssueTokenAsync(verifiedUser, cancellationToken);
+            return new VerifyOtpResult
+            {
+                Verified = true,
+                Token = pendingToken
+            };
+        }
+
         var user = await FindUserByEmailOrPhoneAsync(request.EmailOrPhone, cancellationToken);
         if (user is null)
         {
@@ -294,7 +385,7 @@ public class AuthService : IAuthService
     private async Task CreateAndSendOtpAsync(AppUser user, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+        var code = GenerateOtpCode();
         var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SaltSize));
         var hash = HashOtpCode(code, salt);
 
@@ -317,6 +408,68 @@ public class AuthService : IAuthService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _otpDeliveryService.SendAsync(user.Email, code, cancellationToken);
+    }
+
+    private static string GenerateOtpCode()
+    {
+        return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+    }
+
+    private async Task<PendingRegistrationCacheModel?> GetPendingRegistrationAsync(string email, CancellationToken cancellationToken)
+    {
+        var key = GetPendingRegistrationCacheKey(email);
+        var payload = await _distributedCache.GetStringAsync(key, cancellationToken);
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<PendingRegistrationCacheModel>(payload, PendingRegistrationJsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private Task SavePendingRegistrationAsync(PendingRegistrationCacheModel pendingRegistration, CancellationToken cancellationToken)
+    {
+        var key = GetPendingRegistrationCacheKey(pendingRegistration.Email);
+        var payload = JsonSerializer.Serialize(pendingRegistration, PendingRegistrationJsonOptions);
+        return _distributedCache.SetStringAsync(
+            key,
+            payload,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+            },
+            cancellationToken);
+    }
+
+    private Task RemovePendingRegistrationAsync(string email, CancellationToken cancellationToken)
+    {
+        return _distributedCache.RemoveAsync(GetPendingRegistrationCacheKey(email), cancellationToken);
+    }
+
+    private static string GetPendingRegistrationCacheKey(string email)
+    {
+        return PendingRegistrationCachePrefix + email.Trim().ToLowerInvariant();
+    }
+
+    private sealed class PendingRegistrationCacheModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
+        public string PasswordSalt { get; set; } = string.Empty;
+        public string OtpCodeHash { get; set; } = string.Empty;
+        public string OtpCodeSalt { get; set; } = string.Empty;
+        public DateTime ExpiresAtUtc { get; set; }
+        public int FailedAttempts { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
     }
 
     private static string HashOtpCode(string code, string salt)

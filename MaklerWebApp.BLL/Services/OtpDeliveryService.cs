@@ -31,7 +31,7 @@ public class OtpDeliveryService : IOtpDeliveryService
                 _logger.LogInformation("DEV OTP code for {Destination}: {Code}", destination, code);
             }
 
-            return;
+            throw new InvalidOperationException("OTP email service is not configured. Set OtpEmail:Enabled=true and provide SMTP settings.");
         }
 
         try
@@ -68,6 +68,8 @@ public class OtpDeliveryService : IOtpDeliveryService
             {
                 _logger.LogInformation("Fallback DEV OTP code for {Destination}: {Code}", destination, code);
             }
+
+            throw new InvalidOperationException("OTP code could not be sent. Check SMTP credentials and try again.");
         }
     }
 }

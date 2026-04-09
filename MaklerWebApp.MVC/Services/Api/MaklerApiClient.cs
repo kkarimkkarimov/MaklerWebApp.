@@ -274,6 +274,11 @@ public class MaklerApiClient : IMaklerApiClient
     public async Task<ApiTokenResponse?> LoginAsync(ApiLoginRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/login", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException(await ReadErrorMessageAsync(response, "Email və ya şifrə yanlışdır."));
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -312,7 +317,7 @@ public class MaklerApiClient : IMaklerApiClient
         using var response = await _httpClient.PostAsJsonAsync("api/auth/register", request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            throw new InvalidOperationException(await ReadErrorMessageAsync(response, "Qeydiyyat tamamlanmadı."));
         }
 
         return await response.Content.ReadFromJsonAsync<ApiRegisterResponse>(JsonOptions, cancellationToken);
@@ -321,6 +326,11 @@ public class MaklerApiClient : IMaklerApiClient
     public async Task<bool> RequestOtpAsync(string emailOrPhone, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/request-otp", new { emailOrPhone }, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(await ReadErrorMessageAsync(response, "OTP kodu göndərilə bilmədi."));
+        }
+
         return response.IsSuccessStatusCode;
     }
 
@@ -334,6 +344,23 @@ public class MaklerApiClient : IMaklerApiClient
 
         var payload = await response.Content.ReadFromJsonAsync<ApiVerifyOtpResponse>(JsonOptions, cancellationToken);
         return payload?.Verified == true ? payload.Token : null;
+    }
+
+    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var payload = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(JsonOptions);
+            if (!string.IsNullOrWhiteSpace(payload?.Message))
+            {
+                return payload.Message;
+            }
+        }
+        catch
+        {
+        }
+
+        return fallback;
     }
 
     public async Task<int?> GetPublicListingCountAsync(CancellationToken cancellationToken = default)

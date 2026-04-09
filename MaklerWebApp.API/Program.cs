@@ -31,6 +31,7 @@ public class Program
 
         builder.Services.AddControllers();
         builder.Services.AddLocalization();
+        builder.Services.AddDistributedMemoryCache();
         builder.Services.AddHttpContextAccessor();
         builder.Services.Configure<ImageStorageOptions>(builder.Configuration.GetSection(ImageStorageOptions.SectionName));
         builder.Services.AddScoped<IImageStorageService, LocalImageStorageService>();

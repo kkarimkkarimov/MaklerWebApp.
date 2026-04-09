@@ -42,15 +42,31 @@ public class AccountController : Controller
             return View(model);
         }
 
-        var tokenResponse = await _maklerApiClient.LoginAsync(new ApiLoginRequest
+        ApiTokenResponse? tokenResponse;
+        try
         {
-            Email = model.Email,
-            Password = model.Password
-        }, cancellationToken);
+            tokenResponse = await _maklerApiClient.LoginAsync(new ApiLoginRequest
+            {
+                Email = model.Email,
+                Password = model.Password
+            }, cancellationToken);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            if (RequiresOtpVerification(ex.Message))
+            {
+                TempData["SuccessMessage"] = "OTP təsdiqi tələb olunur. Kod e-mail ünvanınıza yenidən göndərildi.";
+                return RedirectToAction(nameof(VerifyOtp), new { emailOrPhone = model.Email });
+            }
+
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(model);
+        }
 
         if (tokenResponse is null)
         {
             ModelState.AddModelError(string.Empty, "Email və ya şifrə yanlışdır.");
+            ViewData["AuthError"] = "Daxilolma alınmadı. Email/şifrəni yoxlayın və OTP təsdiqi gözləyən hesabdırsa yenidən OTP təsdiq edin.";
             return View(model);
         }
 
@@ -86,13 +102,22 @@ public class AccountController : Controller
             return View(model);
         }
 
-        var registerResponse = await _maklerApiClient.RegisterAsync(new ApiRegisterRequest
+        ApiRegisterResponse? registerResponse;
+        try
         {
-            FullName = model.FullName,
-            Email = model.Email,
-            PhoneNumber = model.PhoneNumber,
-            Password = model.Password
-        }, cancellationToken);
+            registerResponse = await _maklerApiClient.RegisterAsync(new ApiRegisterRequest
+            {
+                FullName = model.FullName,
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                Password = model.Password
+            }, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(model);
+        }
 
         if (registerResponse is null)
         {
@@ -158,8 +183,16 @@ public class AccountController : Controller
             return RedirectToAction(nameof(VerifyOtp));
         }
 
-        await _maklerApiClient.RequestOtpAsync(emailOrPhone, cancellationToken);
-        TempData["SuccessMessage"] = "Yeni OTP kodu göndərildi.";
+        try
+        {
+            await _maklerApiClient.RequestOtpAsync(emailOrPhone, cancellationToken);
+            TempData["SuccessMessage"] = "Yeni OTP kodu göndərildi.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
         return RedirectToAction(nameof(VerifyOtp), new { emailOrPhone });
     }
 
@@ -167,38 +200,31 @@ public class AccountController : Controller
     [Authorize]
     public async Task<IActionResult> Cabinet(CancellationToken cancellationToken)
     {
-        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            await SignOutAsync();
+            await SignOutAsync(cancellationToken);
             return RedirectToAction(nameof(Login));
         }
 
-        IReadOnlyList<ApiPaymentHistoryItem> paymentHistory;
-        ApiPagedResult<ApiListingSummary>? myListings;
-        try
-        {
-            paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
-            myListings = await _maklerApiClient.GetMyListingsAsync(accessToken, 1, 6, cancellationToken);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            var refreshed = await TryRefreshSessionAsync(cancellationToken);
-            if (!refreshed)
+        var paymentHistory = await ExecuteWithRefreshAsync(
+            async (token, ct) =>
             {
-                await SignOutAsync(cancellationToken);
-                return RedirectToAction(nameof(Login));
-            }
+                var items = await _maklerApiClient.GetPaymentHistoryAsync(token, ct);
+                return items.ToList();
+            },
+            accessToken,
+            cancellationToken);
 
-            accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
-            if (string.IsNullOrWhiteSpace(accessToken))
-            {
-                await SignOutAsync(cancellationToken);
-                return RedirectToAction(nameof(Login));
-            }
+        var myListings = await ExecuteWithRefreshAsync(
+            async (token, ct) => await _maklerApiClient.GetMyListingsAsync(token, 1, 6, ct),
+            accessToken,
+            cancellationToken);
 
-            paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
-            myListings = await _maklerApiClient.GetMyListingsAsync(accessToken, 1, 6, cancellationToken);
+        if (paymentHistory is null || myListings is null)
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
         }
 
         var recentListings = (myListings?.Items ?? Array.Empty<ApiListingSummary>())
@@ -530,7 +556,14 @@ public class AccountController : Controller
                 return null;
             }
 
-            return await operation(newAccessToken, cancellationToken);
+            try
+            {
+                return await operation(newAccessToken, cancellationToken);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
         }
     }
 
@@ -557,7 +590,14 @@ public class AccountController : Controller
                 return null;
             }
 
-            return await operation(newAccessToken, cancellationToken);
+            try
+            {
+                return await operation(newAccessToken, cancellationToken);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
         }
     }
 
@@ -673,5 +713,16 @@ public class AccountController : Controller
         output = output.PadRight(output.Length + (4 - output.Length % 4) % 4, '=');
         var bytes = Convert.FromBase64String(output);
         return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    private static bool RequiresOtpVerification(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("otp", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("verified", StringComparison.OrdinalIgnoreCase);
     }
 }

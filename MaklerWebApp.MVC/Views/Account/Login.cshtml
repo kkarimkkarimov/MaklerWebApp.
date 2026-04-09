@@ -9,6 +9,11 @@
         <h1 class="h3 mb-2">Hesaba daxil ol</h1>
         <p class="text-muted mb-4">Davam etmək üçün email və şifrənizi daxil edin.</p>
 
+        @if (ViewData["AuthError"] is string authError && !string.IsNullOrWhiteSpace(authError))
+        {
+            <div class="alert alert-danger" role="alert">@authError</div>
+        }
+
         <form asp-action="Login" method="post" novalidate>
             @Html.AntiForgeryToken()
             <input asp-for="ReturnUrl" type="hidden" />
