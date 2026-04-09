@@ -12,6 +12,15 @@
     <a asp-action="Cabinet" class="btn btn-outline-secondary">Kabinetə qayıt</a>
 </section>
 
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
 <section class="filter-panel">
     @if (Model.Items.Count == 0)
     {
@@ -48,7 +57,37 @@
                             </td>
                             <td>@item.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
                             <td>
-                                <a href="@item.DetailsUrl" class="text-decoration-none">Ətraflı</a>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <a href="@item.DetailsUrl" class="btn btn-sm btn-outline-primary">Ətraflı</a>
+                                    <a asp-controller="Listings" asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Redaktə</a>
+                                    <form asp-action="SetAdStatus" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <input type="hidden" name="adStatus" value="1" />
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Aktiv et</button>
+                                    </form>
+                                    <form asp-action="SetAdStatus" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <input type="hidden" name="adStatus" value="3" />
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Arxivlə</button>
+                                    </form>
+                                    <form asp-action="StartBoost" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <select name="serviceType" class="form-select form-select-sm d-inline-block" style="width: 120px;">
+                                            <option value="1">VIP</option>
+                                            <option value="2">Premium</option>
+                                            <option value="3" selected>Boost</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-brand">Boost</button>
+                                    </form>
+                                    <form asp-action="DeleteListing" method="post" class="d-inline" onsubmit="return confirm('Elanı silmək istədiyinizə əminsiniz?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Sil</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     }

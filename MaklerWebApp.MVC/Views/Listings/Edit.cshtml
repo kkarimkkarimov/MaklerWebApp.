@@ -1,0 +1,160 @@
+@model CreateListingViewModel
+
+@{
+    ViewData["Title"] = "Elanı redaktə et";
+    var listingId = (int?)ViewData["ListingId"] ?? 0;
+}
+
+<section class="mb-4">
+    <h1 class="hero-title fs-2 mb-1">Elanı redaktə et</h1>
+    <p class="hero-subtitle mb-0">Elan məlumatlarınızı yeniləyin və yenidən dərc edin.</p>
+</section>
+
+<section class="filter-panel">
+    <form asp-action="Edit" asp-route-id="@listingId" method="post" novalidate>
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+        <div class="row g-3">
+            <div class="col-12">
+                <label asp-for="Title" class="form-label"></label>
+                <input asp-for="Title" class="form-control" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="5"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="Price" class="form-label"></label>
+                <input asp-for="Price" class="form-control" />
+                <span asp-validation-for="Price" class="text-danger"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="CurrencyType" class="form-label"></label>
+                <select asp-for="CurrencyType" class="form-select">
+                    <option value="1">AZN</option>
+                    <option value="2">USD</option>
+                    <option value="3">EUR</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="Area" class="form-label"></label>
+                <input asp-for="Area" class="form-control" />
+                <span asp-validation-for="Area" class="text-danger"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Rooms" class="form-label"></label>
+                <input asp-for="Rooms" class="form-control" />
+                <span asp-validation-for="Rooms" class="text-danger"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Floor" class="form-label"></label>
+                <input asp-for="Floor" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="TotalFloors" class="form-label"></label>
+                <input asp-for="TotalFloors" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="RepairStatus" class="form-label"></label>
+                <select asp-for="RepairStatus" class="form-select">
+                    <option value="1">Təmirsiz</option>
+                    <option value="2">Kosmetik</option>
+                    <option value="3">Yaxşı</option>
+                    <option value="4">Əla</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="DocumentStatus" class="form-label"></label>
+                <select asp-for="DocumentStatus" class="form-select">
+                    <option value="1">Sənədsiz</option>
+                    <option value="2">Müqavilə</option>
+                    <option value="3">Çıxarış</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="ListingType" class="form-label"></label>
+                <select asp-for="ListingType" class="form-select">
+                    <option value="1">Satıram</option>
+                    <option value="2">Kirayə verirəm</option>
+                    <option value="3">Günlük kirayə</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="PropertyType" class="form-label"></label>
+                <select asp-for="PropertyType" class="form-select">
+                    <option value="1">Mənzil</option>
+                    <option value="2">Ev</option>
+                    <option value="3">Villa</option>
+                    <option value="4">Ofis</option>
+                    <option value="5">Torpaq</option>
+                    <option value="6">Obyekt</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="City" class="form-label"></label>
+                <input asp-for="City" class="form-control" />
+                <span asp-validation-for="City" class="text-danger"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="District" class="form-label"></label>
+                <input asp-for="District" class="form-control" />
+                <span asp-validation-for="District" class="text-danger"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="Address" class="form-label"></label>
+                <input asp-for="Address" class="form-control" />
+                <span asp-validation-for="Address" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="ContactName" class="form-label"></label>
+                <input asp-for="ContactName" class="form-control" />
+                <span asp-validation-for="ContactName" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="ContactPhone" class="form-label"></label>
+                <input asp-for="ContactPhone" class="form-control" />
+                <span asp-validation-for="ContactPhone" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="PrimaryImageUrl" class="form-label">Əsas şəkil URL</label>
+                <input asp-for="PrimaryImageUrl" class="form-control" />
+                <span asp-validation-for="PrimaryImageUrl" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="SecondaryImageUrl" class="form-label">Əlavə şəkil URL</label>
+                <input asp-for="SecondaryImageUrl" class="form-control" />
+                <span asp-validation-for="SecondaryImageUrl" class="text-danger"></span>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-3 mt-1">
+                <div class="form-check">
+                    <input asp-for="IsNewBuilding" class="form-check-input" />
+                    <label asp-for="IsNewBuilding" class="form-check-label">Yeni tikili</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="HasMortgage" class="form-check-input" />
+                    <label asp-for="HasMortgage" class="form-check-label">İpoteka var</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="IsMortgageEligible" class="form-check-input" />
+                    <label asp-for="IsMortgageEligible" class="form-check-label">İpotekaya yararlı</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="IsFurnished" class="form-check-input" />
+                    <label asp-for="IsFurnished" class="form-check-label">Mebelli</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-brand">Yadda saxla</button>
+            <a asp-action="Details" asp-route-id="@listingId" class="btn btn-outline-secondary">Ləğv et</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

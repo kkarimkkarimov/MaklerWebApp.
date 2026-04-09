@@ -10,6 +10,8 @@
         <p class="hero-subtitle mb-0">Ödəniş tarixçəniz və hesab məlumatlarınız.</p>
     </div>
     <div class="d-flex gap-2">
+        <a asp-action="Profile" class="btn btn-outline-secondary">Profil</a>
+        <a asp-controller="Favorites" asp-action="Index" class="btn btn-outline-secondary">Seçilmişlər</a>
         <a asp-action="MyListings" class="btn btn-brand">Mənim elanlarım</a>
         <form asp-action="Logout" method="post">
             @Html.AntiForgeryToken()

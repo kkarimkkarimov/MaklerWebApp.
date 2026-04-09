@@ -155,9 +155,11 @@ public class AccountController : Controller
         }
 
         IReadOnlyList<ApiPaymentHistoryItem> paymentHistory;
+        ApiPagedResult<ApiListingSummary>? myListings;
         try
         {
             paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
+            myListings = await _maklerApiClient.GetMyListingsAsync(accessToken, 1, 6, cancellationToken);
         }
         catch (UnauthorizedAccessException)
         {
@@ -176,12 +178,93 @@ public class AccountController : Controller
             }
 
             paymentHistory = await _maklerApiClient.GetPaymentHistoryAsync(accessToken, cancellationToken);
+            myListings = await _maklerApiClient.GetMyListingsAsync(accessToken, 1, 6, cancellationToken);
         }
+
+        var recentListings = (myListings?.Items ?? Array.Empty<ApiListingSummary>())
+            .Take(5)
+            .Select(x => ToDashboardItem(x, Url.Action("Details", "Listings", new { id = x.Id }) ?? "#"))
+            .ToList();
 
         return View(new CabinetViewModel
         {
-            PaymentHistory = paymentHistory
+            PaymentHistory = paymentHistory,
+            RecentListings = recentListings,
+            TotalListingsCount = myListings?.TotalCount ?? 0,
+            FeaturedListingsCount = (myListings?.Items ?? Array.Empty<ApiListingSummary>()).Count(x => x.IsFeatured),
+            TotalPaymentAmount = paymentHistory.Sum(x => x.Amount)
         });
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> Profile(CancellationToken cancellationToken)
+    {
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var profile = await ExecuteWithRefreshAsync(
+            (token, ct) => _maklerApiClient.GetMyProfileAsync(token, ct),
+            accessToken,
+            cancellationToken);
+
+        if (profile is null)
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        return View(new ProfileViewModel
+        {
+            FullName = profile.FullName,
+            Email = profile.Email,
+            PhoneNumber = profile.PhoneNumber,
+            ProfileImageUrl = profile.ProfileImageUrl,
+            IsVerified = profile.IsVerified
+        });
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Profile(ProfileViewModel model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var updated = await ExecuteWithRefreshAsync(
+            (token, ct) => _maklerApiClient.UpdateMyProfileAsync(token, new ApiUpdateProfileRequest
+            {
+                FullName = model.FullName.Trim(),
+                PhoneNumber = model.PhoneNumber,
+                ProfileImageUrl = model.ProfileImageUrl
+            }, ct),
+            accessToken,
+            cancellationToken);
+
+        if (updated is null)
+        {
+            ModelState.AddModelError(string.Empty, "Profil yenilənmədi. Yenidən cəhd edin.");
+            return View(model);
+        }
+
+        model.Email = updated.Email;
+        model.IsVerified = updated.IsVerified;
+        TempData["SuccessMessage"] = "Profil uğurla yeniləndi.";
+        return View(model);
     }
 
     [HttpGet]
@@ -229,6 +312,81 @@ public class AccountController : Controller
         };
 
         return View(vm);
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteListing(int id, CancellationToken cancellationToken)
+    {
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var deleted = await ExecuteWithRefreshAsync(
+            (Func<string, CancellationToken, Task<bool>>)((token, ct) => _maklerApiClient.DeleteListingAsync(token, id, ct)),
+            accessToken,
+            cancellationToken);
+
+        TempData[deleted == true ? "SuccessMessage" : "ErrorMessage"] = deleted == true
+            ? "Elan silindi."
+            : "Elanı silmək mümkün olmadı.";
+
+        return RedirectToAction(nameof(MyListings));
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetAdStatus(int id, int adStatus, CancellationToken cancellationToken)
+    {
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var updated = await ExecuteWithRefreshAsync(
+            (Func<string, CancellationToken, Task<bool>>)((token, ct) => _maklerApiClient.SetListingAdStatusAsync(token, id, adStatus, ct)),
+            accessToken,
+            cancellationToken);
+
+        TempData[updated == true ? "SuccessMessage" : "ErrorMessage"] = updated == true
+            ? "Elanın statusu yeniləndi."
+            : "Status yenilənmədi.";
+
+        return RedirectToAction(nameof(MyListings));
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> StartBoost(int id, int serviceType, CancellationToken cancellationToken)
+    {
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            await SignOutAsync(cancellationToken);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var payment = await ExecuteWithRefreshAsync(
+            (token, ct) => _maklerApiClient.StartBoostPaymentAsync(token, new ApiBoostPaymentRequest
+            {
+                ListingId = id,
+                ServiceType = serviceType
+            }, ct),
+            accessToken,
+            cancellationToken);
+
+        TempData[payment is not null ? "SuccessMessage" : "ErrorMessage"] = payment is not null
+            ? $"Boost ödənişi yaradıldı. Ref: {payment.Reference}" : "Boost əməliyyatı alınmadı.";
+
+        return RedirectToAction(nameof(MyListings));
     }
 
     [HttpPost]
@@ -311,6 +469,33 @@ public class AccountController : Controller
         Func<string, CancellationToken, Task<T>> operation,
         string accessToken,
         CancellationToken cancellationToken) where T : class
+    {
+        try
+        {
+            return await operation(accessToken, cancellationToken);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            var refreshed = await TryRefreshSessionAsync(cancellationToken);
+            if (!refreshed)
+            {
+                return null;
+            }
+
+            var newAccessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+            if (string.IsNullOrWhiteSpace(newAccessToken))
+            {
+                return null;
+            }
+
+            return await operation(newAccessToken, cancellationToken);
+        }
+    }
+
+    private async Task<bool?> ExecuteWithRefreshAsync(
+        Func<string, CancellationToken, Task<bool>> operation,
+        string accessToken,
+        CancellationToken cancellationToken)
     {
         try
         {

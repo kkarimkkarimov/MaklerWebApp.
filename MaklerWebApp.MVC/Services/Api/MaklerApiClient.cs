@@ -43,8 +43,24 @@ public class MaklerApiClient : IMaklerApiClient
             {
                 ["keyword"] = request.Keyword,
                 ["city"] = request.City,
+                ["district"] = request.District,
+                ["listingType"] = request.ListingType?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["propertyType"] = request.PropertyType?.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["minPrice"] = request.MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["maxPrice"] = request.MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["minArea"] = request.MinArea?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["maxArea"] = request.MaxArea?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["minRooms"] = request.MinRooms?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["maxRooms"] = request.MaxRooms?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["isNewBuilding"] = request.IsNewBuilding?.ToString().ToLowerInvariant(),
+                ["hasMortgage"] = request.HasMortgage?.ToString().ToLowerInvariant(),
+                ["isMortgageEligible"] = request.IsMortgageEligible?.ToString().ToLowerInvariant(),
+                ["isFurnished"] = request.IsFurnished?.ToString().ToLowerInvariant(),
+                ["repairStatus"] = request.RepairStatus?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["documentStatus"] = request.DocumentStatus?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["isFeatured"] = request.IsFeatured?.ToString().ToLowerInvariant(),
+                ["adStatus"] = request.AdStatus?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["onlyWithImages"] = request.OnlyWithImages?.ToString().ToLowerInvariant(),
                 ["page"] = request.Page.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["pageSize"] = request.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["sortBy"] = request.SortBy,
@@ -107,6 +123,57 @@ public class MaklerApiClient : IMaklerApiClient
         }
 
         return await response.Content.ReadFromJsonAsync<ApiListingSummary>(JsonOptions, cancellationToken);
+    }
+
+    public async Task<bool> UpdateListingAsync(string accessToken, int id, ApiCreateListingRequest request, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Put, $"api/listings/{id}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteListingAsync(string accessToken, int id, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"api/listings/{id}");
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> SetListingAdStatusAsync(string accessToken, int id, int adStatus, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Patch, $"api/listings/{id}/ad-status")
+        {
+            Content = JsonContent.Create(new ApiPatchListingAdStatusRequest
+            {
+                AdStatus = adStatus
+            })
+        };
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<ApiListingDetails?> GetListingByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -241,6 +308,117 @@ public class MaklerApiClient : IMaklerApiClient
 
         var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiPaymentHistoryItem>>(JsonOptions, cancellationToken);
         return result ?? Array.Empty<ApiPaymentHistoryItem>();
+    }
+
+    public async Task<ApiPaymentHistoryItem?> StartBoostPaymentAsync(string accessToken, ApiBoostPaymentRequest request, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "api/payments/boost")
+        {
+            Content = JsonContent.Create(request)
+        };
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiPaymentHistoryItem>(JsonOptions, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ApiFavoriteItem>> GetFavoritesAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/favorites");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Array.Empty<ApiFavoriteItem>();
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiFavoriteItem>>(JsonOptions, cancellationToken);
+        return result ?? Array.Empty<ApiFavoriteItem>();
+    }
+
+    public async Task<bool> AddFavoriteAsync(string accessToken, int listingId, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/favorites/{listingId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> RemoveFavoriteAsync(string accessToken, int listingId, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/favorites/{listingId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<ApiUserProfile?> GetMyProfileAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/users/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiUserProfile>(JsonOptions, cancellationToken);
+    }
+
+    public async Task<ApiUserProfile?> UpdateMyProfileAsync(string accessToken, ApiUpdateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Put, "api/users/me")
+        {
+            Content = JsonContent.Create(request)
+        };
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedAccessException("Access token is unauthorized.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiUserProfile>(JsonOptions, cancellationToken);
     }
 
     public async Task<IReadOnlyList<string>> UploadListingImagesAsync(string accessToken, IReadOnlyList<IFormFile> files, CancellationToken cancellationToken = default)
