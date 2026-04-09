@@ -4,6 +4,8 @@ public class ListingsIndexViewModel
 {
     public ListingSearchViewModel Filters { get; set; } = new();
     public IReadOnlyList<ListingCardViewModel> Items { get; set; } = Array.Empty<ListingCardViewModel>();
+    public IReadOnlyList<MapListingMarkerViewModel> MapMarkers { get; set; } = Array.Empty<MapListingMarkerViewModel>();
+    public IReadOnlyList<AzerbaijanLocationViewModel> AzerbaijanLocations { get; set; } = Array.Empty<AzerbaijanLocationViewModel>();
     public int TotalCount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }

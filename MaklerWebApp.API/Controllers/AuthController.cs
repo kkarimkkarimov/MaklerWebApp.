@@ -16,7 +16,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    [ProducesResponseType<TokenResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RegisterResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await _authService.RegisterAsync(request, cancellationToken);
@@ -58,11 +58,13 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-otp")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<VerifyOtpResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request, CancellationToken cancellationToken)
     {
-        var ok = await _authService.VerifyOtpAsync(request, cancellationToken);
-        return ok ? Ok(new { verified = true }) : BadRequest(new { verified = false, message = "Invalid OTP or user not found." });
+        var result = await _authService.VerifyOtpAsync(request, cancellationToken);
+        return result is null
+            ? BadRequest(new { verified = false, message = "Invalid OTP or user not found." })
+            : Ok(result);
     }
 }

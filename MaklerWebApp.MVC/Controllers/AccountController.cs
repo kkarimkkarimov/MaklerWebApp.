@@ -86,7 +86,7 @@ public class AccountController : Controller
             return View(model);
         }
 
-        var tokenResponse = await _maklerApiClient.RegisterAsync(new ApiRegisterRequest
+        var registerResponse = await _maklerApiClient.RegisterAsync(new ApiRegisterRequest
         {
             FullName = model.FullName,
             Email = model.Email,
@@ -94,17 +94,20 @@ public class AccountController : Controller
             Password = model.Password
         }, cancellationToken);
 
-        if (tokenResponse is null)
+        if (registerResponse is null)
         {
             ModelState.AddModelError(string.Empty, "Qeydiyyat uğursuz oldu. Yenidən cəhd edin.");
             return View(model);
         }
 
-        await SignInAsync(tokenResponse, isPersistent: false);
-        await _maklerApiClient.RequestOtpAsync(model.Email, cancellationToken);
+        TempData["SuccessMessage"] = string.IsNullOrWhiteSpace(registerResponse.Message)
+            ? "OTP kodu göndərildi. Hesabı təsdiqləyin."
+            : registerResponse.Message;
+        var verificationTarget = string.IsNullOrWhiteSpace(registerResponse.EmailOrPhone)
+            ? model.Email
+            : registerResponse.EmailOrPhone;
 
-        TempData["SuccessMessage"] = "OTP kodu göndərildi. Hesabı təsdiqləyin.";
-        return RedirectToAction(nameof(VerifyOtp), new { emailOrPhone = model.Email });
+        return RedirectToAction(nameof(VerifyOtp), new { emailOrPhone = verificationTarget });
     }
 
     [HttpGet]
@@ -127,20 +130,37 @@ public class AccountController : Controller
             return View(model);
         }
 
-        var verified = await _maklerApiClient.VerifyOtpAsync(new ApiVerifyOtpRequest
+        var tokenResponse = await _maklerApiClient.VerifyOtpAsync(new ApiVerifyOtpRequest
         {
             EmailOrPhone = model.EmailOrPhone,
             Code = model.Code
         }, cancellationToken);
 
-        if (!verified)
+        if (tokenResponse is null)
         {
             ModelState.AddModelError(nameof(model.Code), "Kod yanlışdır və ya vaxtı bitib.");
             return View(model);
         }
 
+        await SignInAsync(tokenResponse, isPersistent: false);
         TempData["SuccessMessage"] = "Hesab uğurla təsdiqləndi.";
         return RedirectToAction(nameof(Cabinet));
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResendOtp(string emailOrPhone, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(emailOrPhone))
+        {
+            TempData["ErrorMessage"] = "Email ünvanını daxil edin.";
+            return RedirectToAction(nameof(VerifyOtp));
+        }
+
+        await _maklerApiClient.RequestOtpAsync(emailOrPhone, cancellationToken);
+        TempData["SuccessMessage"] = "Yeni OTP kodu göndərildi.";
+        return RedirectToAction(nameof(VerifyOtp), new { emailOrPhone });
     }
 
     [HttpGet]
@@ -289,7 +309,7 @@ public class AccountController : Controller
         }
 
         var apiResult = await ExecuteWithRefreshAsync(
-            (token, ct) => _maklerApiClient.GetMyListingsAsync(token, page, pageSize, ct),
+            async (token, ct) => await _maklerApiClient.GetMyListingsAsync(token, page, pageSize, ct),
             accessToken,
             cancellationToken);
 
@@ -403,15 +423,22 @@ public class AccountController : Controller
         var claims = ReadClaims(tokenResponse.AccessToken);
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = isPersistent,
+            ExpiresUtc = tokenResponse.AccessTokenExpiresAt
+        };
+
+        authProperties.StoreTokens(
+        [
+            new AuthenticationToken { Name = "access_token", Value = tokenResponse.AccessToken },
+            new AuthenticationToken { Name = "refresh_token", Value = tokenResponse.RefreshToken }
+        ]);
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             principal,
-            new AuthenticationProperties
-            {
-                IsPersistent = isPersistent,
-                ExpiresUtc = tokenResponse.AccessTokenExpiresAt
-            });
+            authProperties);
 
         HttpContext.Session.SetString(AuthSessionKeys.AccessToken, tokenResponse.AccessToken);
         HttpContext.Session.SetString(AuthSessionKeys.RefreshToken, tokenResponse.RefreshToken);
@@ -419,7 +446,8 @@ public class AccountController : Controller
 
     private async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
-        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken);
+        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken)
+            ?? await GetStoredTokenAsync("refresh_token");
         if (!string.IsNullOrWhiteSpace(refreshToken))
         {
             await _maklerApiClient.LogoutAsync(refreshToken, cancellationToken);
@@ -438,6 +466,13 @@ public class AccountController : Controller
             return accessToken;
         }
 
+        var storedAccessToken = await GetStoredTokenAsync("access_token");
+        if (!string.IsNullOrWhiteSpace(storedAccessToken))
+        {
+            HttpContext.Session.SetString(AuthSessionKeys.AccessToken, storedAccessToken);
+            return storedAccessToken;
+        }
+
         var refreshed = await TryRefreshSessionAsync(cancellationToken);
         if (!refreshed)
         {
@@ -449,7 +484,8 @@ public class AccountController : Controller
 
     private async Task<bool> TryRefreshSessionAsync(CancellationToken cancellationToken)
     {
-        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken);
+        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken)
+            ?? await GetStoredTokenAsync("refresh_token");
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
             return false;
@@ -465,8 +501,14 @@ public class AccountController : Controller
         return true;
     }
 
+    private async Task<string?> GetStoredTokenAsync(string tokenName)
+    {
+        var authResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return authResult?.Properties?.GetTokenValue(tokenName);
+    }
+
     private async Task<T?> ExecuteWithRefreshAsync<T>(
-        Func<string, CancellationToken, Task<T>> operation,
+        Func<string, CancellationToken, Task<T?>> operation,
         string accessToken,
         CancellationToken cancellationToken) where T : class
     {

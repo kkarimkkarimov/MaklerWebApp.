@@ -1,5 +1,6 @@
 using MaklerWebApp.API.Middleware;
 using MaklerWebApp.API.Models;
+using MaklerWebApp.API.Options;
 using MaklerWebApp.API.Services;
 using MaklerWebApp.API.Authorization;
 using MaklerWebApp.BLL.Extensions;
@@ -8,12 +9,15 @@ using MaklerWebApp.DAL.Constants;
 using MaklerWebApp.DAL.Data;
 using MaklerWebApp.DAL.Extensions;
 using MaklerWebApp.DAL.Localization;
+using MaklerWebApp.DAL.Enums;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.FileProviders;
 using System.Globalization;
 using System.Text;
 
@@ -27,6 +31,8 @@ public class Program
 
         builder.Services.AddControllers();
         builder.Services.AddLocalization();
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.Configure<ImageStorageOptions>(builder.Configuration.GetSection(ImageStorageOptions.SectionName));
         builder.Services.AddScoped<IImageStorageService, LocalImageStorageService>();
 
         builder.Services.Configure<RequestLocalizationOptions>(options =>
@@ -152,11 +158,39 @@ public class Program
 
         var app = builder.Build();
 
+        using (var scope = app.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<MaklerDbContext>();
+            dbContext.Database.Migrate();
+
+            dbContext.Database.ExecuteSqlRaw(
+                "UPDATE [Listings] SET [Status] = {0}, [AdStatus] = {1}, [PublishedAt] = GETUTCDATE() WHERE [IsDeleted] = 0 AND [Status] = {2}",
+                (int)ListingStatus.Approved,
+                (int)AdStatus.Active,
+                (int)ListingStatus.Pending);
+        }
+
         app.UseSwagger();
         app.UseSwaggerUI();
 
         app.UseHttpsRedirection();
         app.UseStaticFiles();
+
+        var imageStorageOptions = app.Services.GetRequiredService<IOptions<ImageStorageOptions>>().Value;
+        var storageRoot = string.IsNullOrWhiteSpace(imageStorageOptions.StorageRootPath)
+            ? "storage"
+            : imageStorageOptions.StorageRootPath;
+        var storageRootPath = Path.IsPathRooted(storageRoot)
+            ? storageRoot
+            : Path.Combine(app.Environment.ContentRootPath, storageRoot);
+        Directory.CreateDirectory(storageRootPath);
+
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(storageRootPath),
+            RequestPath = "/" + imageStorageOptions.PublicPathPrefix.Trim('/').Trim()
+        });
+
         var requestLocalizationOptions = app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value;
         app.UseRequestLocalization(requestLocalizationOptions);
         app.UseMiddleware<ApiExceptionMiddleware>();

@@ -30,6 +30,14 @@ public class ListingsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("map")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SearchMapMarkers([FromQuery] ListingSearchRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _listingService.SearchMapMarkersAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("{id:int}")]
     [AllowAnonymous]
     public async Task<IActionResult> GetById(int id, [FromQuery] string? languageCode, CancellationToken cancellationToken)

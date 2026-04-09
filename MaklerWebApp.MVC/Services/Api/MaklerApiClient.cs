@@ -15,6 +15,71 @@ public class MaklerApiClient : IMaklerApiClient
         public List<string> ImageUrls { get; set; } = new();
     }
 
+    public async Task<IReadOnlyList<ApiMapListingMarker>> SearchMapListingsAsync(ApiListingSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var queryParams = new Dictionary<string, string?>
+            {
+                ["keyword"] = request.Keyword,
+                ["city"] = request.City,
+                ["district"] = request.District,
+                ["listingType"] = request.ListingType?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["propertyType"] = request.PropertyType?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["minPrice"] = request.MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["maxPrice"] = request.MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["minArea"] = request.MinArea?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["maxArea"] = request.MaxArea?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["minRooms"] = request.MinRooms?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["maxRooms"] = request.MaxRooms?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["isNewBuilding"] = request.IsNewBuilding?.ToString().ToLowerInvariant(),
+                ["hasMortgage"] = request.HasMortgage?.ToString().ToLowerInvariant(),
+                ["isMortgageEligible"] = request.IsMortgageEligible?.ToString().ToLowerInvariant(),
+                ["isFurnished"] = request.IsFurnished?.ToString().ToLowerInvariant(),
+                ["repairStatus"] = request.RepairStatus?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["documentStatus"] = request.DocumentStatus?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["isFeatured"] = request.IsFeatured?.ToString().ToLowerInvariant(),
+                ["adStatus"] = request.AdStatus?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["onlyWithImages"] = request.OnlyWithImages?.ToString().ToLowerInvariant(),
+                ["sortBy"] = request.SortBy,
+                ["descending"] = request.Descending.ToString().ToLowerInvariant()
+            };
+
+            var url = QueryHelpers.AddQueryString("api/listings/map", queryParams!);
+            using var response = await _httpClient.GetAsync(url, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Array.Empty<ApiMapListingMarker>();
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiMapListingMarker>>(JsonOptions, cancellationToken);
+            return result ?? Array.Empty<ApiMapListingMarker>();
+        }
+        catch
+        {
+            return Array.Empty<ApiMapListingMarker>();
+        }
+    }
+
+    public async Task<IReadOnlyList<ApiAzerbaijanLocation>> GetAzerbaijanLocationsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _httpClient.GetAsync("api/locations/az", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Array.Empty<ApiAzerbaijanLocation>();
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<IReadOnlyList<ApiAzerbaijanLocation>>(JsonOptions, cancellationToken);
+            return result ?? Array.Empty<ApiAzerbaijanLocation>();
+        }
+        catch
+        {
+            return Array.Empty<ApiAzerbaijanLocation>();
+        }
+    }
+
     private readonly HttpClient _httpClient;
 
     public MaklerApiClient(HttpClient httpClient)
@@ -242,7 +307,7 @@ public class MaklerApiClient : IMaklerApiClient
         _ = response.IsSuccessStatusCode;
     }
 
-    public async Task<ApiTokenResponse?> RegisterAsync(ApiRegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<ApiRegisterResponse?> RegisterAsync(ApiRegisterRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/register", request, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -250,7 +315,7 @@ public class MaklerApiClient : IMaklerApiClient
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<ApiTokenResponse>(JsonOptions, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ApiRegisterResponse>(JsonOptions, cancellationToken);
     }
 
     public async Task<bool> RequestOtpAsync(string emailOrPhone, CancellationToken cancellationToken = default)
@@ -259,16 +324,16 @@ public class MaklerApiClient : IMaklerApiClient
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> VerifyOtpAsync(ApiVerifyOtpRequest request, CancellationToken cancellationToken = default)
+    public async Task<ApiTokenResponse?> VerifyOtpAsync(ApiVerifyOtpRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/verify-otp", request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            return false;
+            return null;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<ApiVerifyOtpResponse>(JsonOptions, cancellationToken);
-        return payload?.Verified == true;
+        return payload?.Verified == true ? payload.Token : null;
     }
 
     public async Task<int?> GetPublicListingCountAsync(CancellationToken cancellationToken = default)

@@ -18,12 +18,16 @@ namespace MaklerWebApp.MVC
             builder.Services.AddControllersWithViews();
             builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
             builder.Services.AddDistributedMemoryCache();
+            var cookieSecurePolicy = builder.Environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
+
             builder.Services.AddSession(options =>
             {
                 options.Cookie.Name = "MaklerWebApp.Session";
                 options.Cookie.HttpOnly = true;
                 options.Cookie.IsEssential = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SecurePolicy = cookieSecurePolicy;
                 options.IdleTimeout = TimeSpan.FromHours(8);
             });
             builder.Services
@@ -32,7 +36,7 @@ namespace MaklerWebApp.MVC
                 {
                     options.Cookie.Name = "MaklerWebApp.Auth";
                     options.Cookie.HttpOnly = true;
-                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SecurePolicy = cookieSecurePolicy;
                     options.Cookie.SameSite = SameSiteMode.Lax;
                     options.LoginPath = "/Account/Login";
                     options.AccessDeniedPath = "/Account/Login";

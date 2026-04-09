@@ -5,6 +5,7 @@ namespace MaklerWebApp.BLL.Services;
 public interface IListingService
 {
     Task<PagedResult<ListingDto>> SearchAsync(ListingSearchRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ListingMapMarkerDto>> SearchMapMarkersAsync(ListingSearchRequest request, CancellationToken cancellationToken = default);
     Task<ListingDto?> GetByIdAsync(int id, string? languageCode, CancellationToken cancellationToken = default);
     Task<PagedResult<ListingDto>> GetByUserIdAsync(int userId, int page, int pageSize, string? languageCode, CancellationToken cancellationToken = default);
     Task<ListingDto> CreateAsync(CreateListingRequest request, int ownerUserId, CancellationToken cancellationToken = default);

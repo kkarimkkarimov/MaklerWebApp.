@@ -4,54 +4,318 @@
     ViewData["Title"] = "Ana səhifə";
 }
 
-<section class="hero-card mb-5">
-    <p class="text-uppercase text-primary fw-semibold mb-2">MaklerWebApp</p>
-    <h1 class="hero-title">Daşınmaz əmlakı daha sürətli və daha rahat tapın</h1>
-    <p class="hero-subtitle mb-4">Satış və kirayə elanlarını filtr, müqayisə et və bir neçə kliklə ən uyğun variantı seç.</p>
-
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a class="btn btn-brand" href="#featured-listings">Premium elanlara bax</a>
-        <a class="btn btn-outline-secondary" asp-controller="Listings" asp-action="Index">Bütün elanlar</a>
-    </div>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <p class="stat-value">@Model.PublicListingCount</p>
-            <p class="stat-label">Aktiv elan</p>
+<section class="home-hero mb-4">
+    <div class="home-hero-top">
+        <div>
+            <h1 class="home-title">Daşınmaz əmlakı premium təcrübə ilə tapın</h1>
+            <p class="home-subtitle mb-0">Bütün məlumatlar real vaxtda API-dən yüklənir: axtar, filtr et və uyğun evi seç.</p>
         </div>
-        <div class="stat-card">
-            <p class="stat-value">24/7</p>
-            <p class="stat-label">Platforma əlçatanlığı</p>
-        </div>
-        <div class="stat-card">
-            <p class="stat-value">@(Model.ApiHealthy ? "Online" : "Offline")</p>
-            <p class="stat-label">API statusu</p>
+        <div class="home-statuses">
+            <span class="home-pill">@Model.PublicListingCount aktiv elan</span>
+            <span class="home-pill @(Model.ApiHealthy ? "is-online" : "is-offline")">API: @(Model.ApiHealthy ? "Online" : "Offline")</span>
         </div>
     </div>
+
+    <form method="get" asp-controller="Home" asp-action="Index" class="home-search-box mt-3">
+        <div class="home-search-grid">
+            <select name="ListingType" class="form-select">
+                @if (Model.Search.ListingType is null)
+                {
+                    <option value="" selected>Əməliyyat</option>
+                }
+                else
+                {
+                    <option value="">Əməliyyat</option>
+                }
+                @if (Model.Search.ListingType == 1)
+                {
+                    <option value="1" selected>Alış</option>
+                }
+                else
+                {
+                    <option value="1">Alış</option>
+                }
+                @if (Model.Search.ListingType == 2)
+                {
+                    <option value="2" selected>Kirayə</option>
+                }
+                else
+                {
+                    <option value="2">Kirayə</option>
+                }
+                @if (Model.Search.ListingType == 3)
+                {
+                    <option value="3" selected>Günlük</option>
+                }
+                else
+                {
+                    <option value="3">Günlük</option>
+                }
+            </select>
+
+            <select name="PropertyType" class="form-select">
+                @if (Model.Search.PropertyType is null)
+                {
+                    <option value="" selected>Əmlak növü</option>
+                }
+                else
+                {
+                    <option value="">Əmlak növü</option>
+                }
+                @if (Model.Search.PropertyType == 1)
+                {
+                    <option value="1" selected>Mənzil</option>
+                }
+                else
+                {
+                    <option value="1">Mənzil</option>
+                }
+                @if (Model.Search.PropertyType == 2)
+                {
+                    <option value="2" selected>Ev</option>
+                }
+                else
+                {
+                    <option value="2">Ev</option>
+                }
+                @if (Model.Search.PropertyType == 3)
+                {
+                    <option value="3" selected>Villa</option>
+                }
+                else
+                {
+                    <option value="3">Villa</option>
+                }
+                @if (Model.Search.PropertyType == 4)
+                {
+                    <option value="4" selected>Ofis</option>
+                }
+                else
+                {
+                    <option value="4">Ofis</option>
+                }
+                @if (Model.Search.PropertyType == 5)
+                {
+                    <option value="5" selected>Torpaq</option>
+                }
+                else
+                {
+                    <option value="5">Torpaq</option>
+                }
+                @if (Model.Search.PropertyType == 6)
+                {
+                    <option value="6" selected>Obyekt</option>
+                }
+                else
+                {
+                    <option value="6">Obyekt</option>
+                }
+            </select>
+
+            <select name="MinRooms" class="form-select">
+                <option value="">Otaq sayı</option>
+                @if (Model.Search.MinRooms == 1)
+                {
+                    <option value="1" selected>1+</option>
+                }
+                else
+                {
+                    <option value="1">1+</option>
+                }
+                @if (Model.Search.MinRooms == 2)
+                {
+                    <option value="2" selected>2+</option>
+                }
+                else
+                {
+                    <option value="2">2+</option>
+                }
+                @if (Model.Search.MinRooms == 3)
+                {
+                    <option value="3" selected>3+</option>
+                }
+                else
+                {
+                    <option value="3">3+</option>
+                }
+                @if (Model.Search.MinRooms == 4)
+                {
+                    <option value="4" selected>4+</option>
+                }
+                else
+                {
+                    <option value="4">4+</option>
+                }
+            </select>
+
+            <input type="number" min="0" name="MinPrice" value="@Model.Search.MinPrice" class="form-control" placeholder="Min qiymət" />
+            <input type="number" min="0" name="MaxPrice" value="@Model.Search.MaxPrice" class="form-control" placeholder="Max qiymət" />
+
+            <select name="City" id="homeCityFilter" class="form-select">
+                <option value="">Şəhər seçin</option>
+                @foreach (var city in Model.AzerbaijanLocations)
+                {
+                    @if (string.Equals(Model.Search.City, city.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="@city.Name" selected>@city.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@city.Name">@city.Name</option>
+                    }
+                }
+            </select>
+
+            <select name="District" id="homeDistrictFilter" class="form-select" data-selected="@Model.Search.District">
+                <option value="">Rayon seçin</option>
+            </select>
+
+            <button type="submit" class="btn btn-brand home-search-btn">Axtar</button>
+        </div>
+
+        <div class="home-chip-row mt-3">
+            <a asp-controller="Home" asp-action="Index" asp-route-IsNewBuilding="true" class="home-chip">Yeni tikili</a>
+            <a asp-controller="Home" asp-action="Index" asp-route-IsFurnished="true" class="home-chip">Mebelli</a>
+            <a asp-controller="Home" asp-action="Index" asp-route-HasMortgage="true" class="home-chip">İpotekalı</a>
+            <a asp-controller="Home" asp-action="Index" asp-route-OnlyWithImages="true" class="home-chip">Yalnız şəkilli</a>
+            <a asp-controller="Home" asp-action="Index" asp-route-IsFeatured="true" class="home-chip">Premium</a>
+        </div>
+    </form>
 </section>
 
-<section id="featured-listings">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="section-title mb-0">Seçilmiş elanlar</h2>
-        <a asp-controller="Listings" asp-action="Index" class="text-decoration-none">Hamısına bax</a>
-    </div>
-
-    @if (Model.FeaturedListings.Count == 0)
-    {
-        <div class="empty-state">
-            <h3 class="h5 mb-2">Hələ elan yoxdur</h3>
-            <p class="text-muted mb-0">Yeni elan əlavə etdikdən sonra burada görünəcək.</p>
+@if (Model.IsSearchApplied)
+{
+    <section class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="section-title mb-0">Axtarış nəticələri</h2>
+            <a asp-controller="Home" asp-action="Index">Sıfırla</a>
         </div>
-    }
-    else
-    {
-        <div class="row g-4">
-            @foreach (var listing in Model.FeaturedListings)
+
+        @if (Model.SearchResults.Count == 0)
+        {
+            <div class="empty-state"><p class="mb-0 text-muted">Filtrə uyğun elan tapılmadı.</p></div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var listing in Model.SearchResults)
+                {
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <partial name="_ListingCard" model="listing" />
+                    </div>
+                }
+            </div>
+        }
+    </section>
+}
+
+<section class="home-content-shell">
+    <aside class="home-ad-slot d-none d-xl-flex">Reklam</aside>
+
+    <div class="home-main-sections">
+        <section class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="section-title mb-0">Yaşayış kompleksləri</h2>
+                <a asp-controller="Home" asp-action="Index" asp-route-ListingType="1" asp-route-PropertyType="1">Daha çox</a>
+            </div>
+            @if (Model.ResidentialComplexes.Count == 0)
             {
-                <div class="col-12 col-md-6 col-xl-4">
-                    <partial name="_ListingCard" model="listing" />
+                <div class="empty-state"><p class="mb-0 text-muted">Hazırda nəticə yoxdur.</p></div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var listing in Model.ResidentialComplexes.Take(4))
+                    {
+                        <div class="col-12 col-md-6 col-xl-3">
+                            <partial name="_ListingCard" model="listing" />
+                        </div>
+                    }
                 </div>
             }
-        </div>
-    }
+        </section>
+
+        <section class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="section-title mb-0">Kirayə elanları</h2>
+                <a asp-controller="Home" asp-action="Index" asp-route-ListingType="2">Daha çox</a>
+            </div>
+            @if (Model.AgencyListings.Count == 0)
+            {
+                <div class="empty-state"><p class="mb-0 text-muted">Hazırda nəticə yoxdur.</p></div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var listing in Model.AgencyListings.Take(4))
+                    {
+                        <div class="col-12 col-md-6 col-xl-3">
+                            <partial name="_ListingCard" model="listing" />
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <section>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="section-title mb-0">Premium elanlar</h2>
+                <a asp-controller="Home" asp-action="Index" asp-route-IsFeatured="true">Daha çox</a>
+            </div>
+            @if (Model.PremiumListings.Count == 0)
+            {
+                <div class="empty-state"><p class="mb-0 text-muted">Hazırda nəticə yoxdur.</p></div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var listing in Model.PremiumListings.Take(4))
+                    {
+                        <div class="col-12 col-md-6 col-xl-3">
+                            <partial name="_ListingCard" model="listing" />
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+
+    <aside class="home-ad-slot d-none d-xl-flex">Reklam</aside>
 </section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const locations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AzerbaijanLocations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+            const cityFilter = document.getElementById('homeCityFilter');
+            const districtFilter = document.getElementById('homeDistrictFilter');
+
+            function fillDistricts() {
+                const selectedCity = cityFilter?.value || '';
+                const selectedDistrict = districtFilter?.dataset.selected || '';
+                const city = locations.find(x => x.name === selectedCity);
+                districtFilter.innerHTML = '<option value="">Rayon seçin</option>';
+
+                if (!city) {
+                    return;
+                }
+
+                city.districts.forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    if (selectedDistrict && selectedDistrict === district) {
+                        option.selected = true;
+                    }
+                    districtFilter.appendChild(option);
+                });
+            }
+
+            cityFilter?.addEventListener('change', () => {
+                districtFilter.dataset.selected = '';
+                fillDistricts();
+            });
+            fillDistricts();
+        })();
+    </script>
+}

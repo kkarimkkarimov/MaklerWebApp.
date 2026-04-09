@@ -38,12 +38,20 @@ public class ListingRepository : IListingRepository
                 EF.Functions.Like(x.Address, keyword));
         }
 
-        if (!string.IsNullOrWhiteSpace(criteria.City))
+        if (criteria.CityCandidates is { Count: > 0 })
+        {
+            query = query.Where(x => criteria.CityCandidates.Contains(x.City));
+        }
+        else if (!string.IsNullOrWhiteSpace(criteria.City))
         {
             query = query.Where(x => x.City == criteria.City);
         }
 
-        if (!string.IsNullOrWhiteSpace(criteria.District))
+        if (criteria.DistrictCandidates is { Count: > 0 })
+        {
+            query = query.Where(x => criteria.DistrictCandidates.Contains(x.District));
+        }
+        else if (!string.IsNullOrWhiteSpace(criteria.District))
         {
             query = query.Where(x => x.District == criteria.District);
         }

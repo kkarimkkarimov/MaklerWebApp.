@@ -160,9 +160,7 @@ namespace MaklerWebApp.DAL.Data.Migrations
                         .HasColumnType("nvarchar(80)");
 
                     b.Property<int>("DocumentStatus")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("FeaturedUntil")
                         .HasColumnType("datetime2");
@@ -214,9 +212,7 @@ namespace MaklerWebApp.DAL.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("RepairStatus")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
 
                     b.Property<int>("Rooms")
                         .HasColumnType("int");

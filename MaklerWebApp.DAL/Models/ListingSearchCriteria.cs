@@ -7,6 +7,8 @@ public class ListingSearchCriteria
     public string? Keyword { get; set; }
     public string? City { get; set; }
     public string? District { get; set; }
+    public IReadOnlyList<string>? CityCandidates { get; set; }
+    public IReadOnlyList<string>? DistrictCandidates { get; set; }
     public ListingType? ListingType { get; set; }
     public PropertyType? PropertyType { get; set; }
     public decimal? MinPrice { get; set; }

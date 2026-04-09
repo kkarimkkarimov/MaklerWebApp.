@@ -1,3 +1,8 @@
+using MaklerWebApp.API.Options;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+
 namespace MaklerWebApp.API.Services;
 
 public sealed class LocalImageStorageService : IImageStorageService
@@ -7,12 +12,19 @@ public sealed class LocalImageStorageService : IImageStorageService
         ".jpg", ".jpeg", ".png", ".webp", ".gif"
     };
 
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
     private readonly IWebHostEnvironment _environment;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ImageStorageOptions _options;
+    private readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
 
-    public LocalImageStorageService(IWebHostEnvironment environment)
+    public LocalImageStorageService(
+        IWebHostEnvironment environment,
+        IHttpContextAccessor httpContextAccessor,
+        IOptions<ImageStorageOptions> options)
     {
         _environment = environment;
+        _httpContextAccessor = httpContextAccessor;
+        _options = options.Value;
     }
 
     public async Task<string> SaveAsync(IFormFile file, string folder, CancellationToken cancellationToken = default)
@@ -22,33 +34,43 @@ public sealed class LocalImageStorageService : IImageStorageService
             throw new ArgumentException("Image file is required.");
         }
 
-        if (file.Length > MaxFileSizeBytes)
+        var maxFileSizeBytes = Math.Max(1, _options.MaxFileSizeMb) * 1024L * 1024L;
+        if (file.Length > maxFileSizeBytes)
         {
-            throw new ArgumentException("Image size cannot exceed 10 MB.");
+            throw new ArgumentException($"Image size cannot exceed {_options.MaxFileSizeMb} MB.");
         }
 
-        var extension = Path.GetExtension(file.FileName);
+        var extension = Path.GetExtension(file.FileName)?.ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
         {
             throw new ArgumentException("Unsupported image format. Allowed: .jpg, .jpeg, .png, .webp, .gif");
         }
 
-        var webRootPath = _environment.WebRootPath;
-        if (string.IsNullOrWhiteSpace(webRootPath))
+        if (!_contentTypeProvider.TryGetContentType($"file{extension}", out var expectedContentType)
+            || string.IsNullOrWhiteSpace(file.ContentType)
+            || !file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(file.ContentType, expectedContentType, StringComparison.OrdinalIgnoreCase))
         {
-            webRootPath = Path.Combine(_environment.ContentRootPath, "wwwroot");
+            throw new ArgumentException("Invalid image content type.");
         }
 
-        var folderPath = Path.Combine(webRootPath, "uploads", folder);
+        var normalizedFolder = NormalizeFolder(folder);
+        var datedPath = Path.Combine(DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"));
+
+        var storageRootPath = GetStorageRootPath();
+        var folderPath = Path.Combine(storageRootPath, normalizedFolder, datedPath);
         Directory.CreateDirectory(folderPath);
 
-        var fileName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var fileName = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{RandomNumberGenerator.GetHexString(10).ToLowerInvariant()}{extension}";
         var physicalPath = Path.Combine(folderPath, fileName);
 
         await using var stream = new FileStream(physicalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         await file.CopyToAsync(stream, cancellationToken);
 
-        return $"/uploads/{folder}/{fileName}";
+        var relativePublicPath = $"/{_options.PublicPathPrefix.Trim('/').Trim()}" +
+                                 $"/{normalizedFolder}/{datedPath.Replace('\\', '/')}/{fileName}";
+
+        return BuildAbsoluteUrl(relativePublicPath);
     }
 
     public Task<bool> DeleteByUrlAsync(string? fileUrl, CancellationToken cancellationToken = default)
@@ -61,27 +83,23 @@ public sealed class LocalImageStorageService : IImageStorageService
         var localPath = fileUrl;
         if (Uri.TryCreate(fileUrl, UriKind.Absolute, out var absoluteUri))
         {
-            localPath = absoluteUri.LocalPath;
+            localPath = absoluteUri.AbsolutePath;
         }
 
         localPath = localPath.Replace('\\', '/').Trim();
-        if (localPath.StartsWith('/'))
+        if (!localPath.StartsWith('/'))
         {
-            localPath = localPath[1..];
+            localPath = "/" + localPath;
         }
 
-        if (!localPath.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        var publicPrefix = "/" + _options.PublicPathPrefix.Trim('/').Trim();
+        if (!localPath.StartsWith(publicPrefix + "/", StringComparison.OrdinalIgnoreCase))
         {
             return Task.FromResult(false);
         }
 
-        var webRootPath = _environment.WebRootPath;
-        if (string.IsNullOrWhiteSpace(webRootPath))
-        {
-            webRootPath = Path.Combine(_environment.ContentRootPath, "wwwroot");
-        }
-
-        var physicalPath = Path.Combine(webRootPath, localPath.Replace('/', Path.DirectorySeparatorChar));
+        var relativeStoragePath = localPath[(publicPrefix.Length + 1)..];
+        var physicalPath = Path.Combine(GetStorageRootPath(), relativeStoragePath.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(physicalPath))
         {
             return Task.FromResult(false);
@@ -89,5 +107,49 @@ public sealed class LocalImageStorageService : IImageStorageService
 
         File.Delete(physicalPath);
         return Task.FromResult(true);
+    }
+
+    private string GetStorageRootPath()
+    {
+        var configured = _options.StorageRootPath?.Trim();
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = "storage";
+        }
+
+        return Path.IsPathRooted(configured)
+            ? configured
+            : Path.Combine(_environment.ContentRootPath, configured);
+    }
+
+    private string BuildAbsoluteUrl(string relativePath)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.PublicBaseUrl))
+        {
+            return new Uri(new Uri(_options.PublicBaseUrl!.TrimEnd('/') + "/"), relativePath.TrimStart('/')).ToString();
+        }
+
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request is not null)
+        {
+            return $"{request.Scheme}://{request.Host}{relativePath}";
+        }
+
+        return relativePath;
+    }
+
+    private static string NormalizeFolder(string folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return "general";
+        }
+
+        return new string(folder
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' ? ch : '-')
+            .ToArray())
+            .Trim('-');
     }
 }

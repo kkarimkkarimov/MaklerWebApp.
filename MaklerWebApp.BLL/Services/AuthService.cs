@@ -32,10 +32,11 @@ public class AuthService : IAuthService
         _otpDeliveryService = otpDeliveryService;
     }
 
-    public async Task<TokenResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-        if (await _dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken))
+        var existingUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+        if (existingUser is not null && existingUser.IsVerified)
         {
             throw new ArgumentException("Email already exists.");
         }
@@ -43,22 +44,41 @@ public class AuthService : IAuthService
         var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SaltSize));
         var hash = HashPassword(request.Password, salt);
 
-        var user = new AppUser
+        AppUser user;
+        if (existingUser is null)
         {
-            FullName = request.FullName.Trim(),
-            Email = email,
-            PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
-            PasswordSalt = salt,
-            PasswordHash = hash,
-            Role = UserRoles.User,
-            IsVerified = false
-        };
+            user = new AppUser
+            {
+                FullName = request.FullName.Trim(),
+                Email = email,
+                PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
+                PasswordSalt = salt,
+                PasswordHash = hash,
+                Role = UserRoles.User,
+                IsVerified = false
+            };
 
-        _dbContext.Users.Add(user);
+            _dbContext.Users.Add(user);
+        }
+        else
+        {
+            user = existingUser;
+            user.FullName = request.FullName.Trim();
+            user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
+            user.PasswordSalt = salt;
+            user.PasswordHash = hash;
+            user.IsVerified = false;
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         await CreateAndSendOtpAsync(user, cancellationToken);
 
-        return await IssueTokenAsync(user, cancellationToken);
+        return new RegisterResponse
+        {
+            RequiresOtpVerification = true,
+            EmailOrPhone = user.Email,
+            Message = "OTP kodu e-mail ünvanınıza göndərildi. Kodu təsdiqlədikdən sonra hesab aktiv olacaq."
+        };
     }
 
     public async Task<TokenResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -74,6 +94,12 @@ public class AuthService : IAuthService
         if (!isValidPassword)
         {
             return null;
+        }
+
+        if (!user.IsVerified)
+        {
+            await CreateAndSendOtpAsync(user, cancellationToken);
+            throw new UnauthorizedAccessException("Account is not verified. Please confirm OTP first.");
         }
 
         if (needsRehash)
@@ -127,12 +153,12 @@ public class AuthService : IAuthService
         await CreateAndSendOtpAsync(user, cancellationToken);
     }
 
-    public async Task<bool> VerifyOtpAsync(VerifyOtpRequest request, CancellationToken cancellationToken = default)
+    public async Task<VerifyOtpResult?> VerifyOtpAsync(VerifyOtpRequest request, CancellationToken cancellationToken = default)
     {
         var user = await FindUserByEmailOrPhoneAsync(request.EmailOrPhone, cancellationToken);
         if (user is null)
         {
-            return false;
+            return null;
         }
 
         var now = DateTime.UtcNow;
@@ -143,7 +169,7 @@ public class AuthService : IAuthService
 
         if (otp is null || otp.ExpiresAt <= now || otp.FailedAttempts >= MaxOtpAttempts)
         {
-            return false;
+            return null;
         }
 
         var isMatch = VerifyOtpCode(request.Code, otp.CodeSalt, otp.CodeHash);
@@ -151,13 +177,18 @@ public class AuthService : IAuthService
         {
             otp.FailedAttempts++;
             await _dbContext.SaveChangesAsync(cancellationToken);
-            return false;
+            return null;
         }
 
         otp.ConsumedAt = now;
         user.IsVerified = true;
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return true;
+        var token = await IssueTokenAsync(user, cancellationToken);
+        return new VerifyOtpResult
+        {
+            Verified = true,
+            Token = token
+        };
     }
 
     private async Task<TokenResponse> IssueTokenAsync(AppUser user, CancellationToken cancellationToken)

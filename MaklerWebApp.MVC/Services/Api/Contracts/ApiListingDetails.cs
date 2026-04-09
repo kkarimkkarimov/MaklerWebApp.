@@ -11,6 +11,8 @@ public class ApiListingDetails
     public int Rooms { get; set; }
     public string City { get; set; } = string.Empty;
     public string District { get; set; } = string.Empty;
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
     public string Address { get; set; } = string.Empty;
     public string ContactName { get; set; } = string.Empty;
     public string ContactPhone { get; set; } = string.Empty;

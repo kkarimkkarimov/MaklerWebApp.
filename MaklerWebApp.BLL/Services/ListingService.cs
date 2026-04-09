@@ -16,15 +16,47 @@ public class ListingService : IListingService
 {
     private readonly IListingRepository _listingRepository;
     private readonly MaklerDbContext _dbContext;
+    private readonly ILocationService _locationService;
 
-    public ListingService(IListingRepository listingRepository, MaklerDbContext dbContext)
+    public ListingService(IListingRepository listingRepository, MaklerDbContext dbContext, ILocationService locationService)
     {
         _listingRepository = listingRepository;
         _dbContext = dbContext;
+        _locationService = locationService;
     }
 
     public async Task<PagedResult<ListingDto>> SearchAsync(ListingSearchRequest request, CancellationToken cancellationToken = default)
     {
+        var cityCandidates = string.IsNullOrWhiteSpace(request.City)
+            ? Array.Empty<string>()
+            : _locationService.GetCitySearchCandidates(request.City);
+
+        if (!string.IsNullOrWhiteSpace(request.City) && cityCandidates.Count == 0)
+        {
+            return new PagedResult<ListingDto>
+            {
+                Items = Array.Empty<ListingDto>(),
+                TotalCount = 0,
+                Page = request.Page <= 0 ? 1 : request.Page,
+                PageSize = request.PageSize <= 0 || request.PageSize > 100 ? 20 : request.PageSize
+            };
+        }
+
+        var districtCandidates = string.IsNullOrWhiteSpace(request.District)
+            ? Array.Empty<string>()
+            : _locationService.GetDistrictSearchCandidates(request.City ?? string.Empty, request.District);
+
+        if (!string.IsNullOrWhiteSpace(request.District) && districtCandidates.Count == 0)
+        {
+            return new PagedResult<ListingDto>
+            {
+                Items = Array.Empty<ListingDto>(),
+                TotalCount = 0,
+                Page = request.Page <= 0 ? 1 : request.Page,
+                PageSize = request.PageSize <= 0 || request.PageSize > 100 ? 20 : request.PageSize
+            };
+        }
+
         var page = request.Page <= 0 ? 1 : request.Page;
         var pageSize = request.PageSize <= 0 || request.PageSize > 100 ? 20 : request.PageSize;
 
@@ -33,6 +65,8 @@ public class ListingService : IListingService
             Keyword = request.Keyword,
             City = request.City,
             District = request.District,
+            CityCandidates = cityCandidates,
+            DistrictCandidates = districtCandidates,
             ListingType = request.ListingType.HasValue ? (DalEnums.ListingType?)request.ListingType.Value : null,
             PropertyType = request.PropertyType.HasValue ? (DalEnums.PropertyType?)request.PropertyType.Value : null,
             MinPrice = request.MinPrice,
@@ -71,6 +105,88 @@ public class ListingService : IListingService
         };
     }
 
+    public async Task<IReadOnlyList<ListingMapMarkerDto>> SearchMapMarkersAsync(ListingSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var cityCandidates = string.IsNullOrWhiteSpace(request.City)
+            ? Array.Empty<string>()
+            : _locationService.GetCitySearchCandidates(request.City);
+
+        if (!string.IsNullOrWhiteSpace(request.City) && cityCandidates.Count == 0)
+        {
+            return Array.Empty<ListingMapMarkerDto>();
+        }
+
+        var districtCandidates = string.IsNullOrWhiteSpace(request.District)
+            ? Array.Empty<string>()
+            : _locationService.GetDistrictSearchCandidates(request.City ?? string.Empty, request.District);
+
+        if (!string.IsNullOrWhiteSpace(request.District) && districtCandidates.Count == 0)
+        {
+            return Array.Empty<ListingMapMarkerDto>();
+        }
+
+        var criteria = new ListingSearchCriteria
+        {
+            Keyword = request.Keyword,
+            City = request.City,
+            District = request.District,
+            CityCandidates = cityCandidates,
+            DistrictCandidates = districtCandidates,
+            ListingType = request.ListingType.HasValue ? (DalEnums.ListingType?)request.ListingType.Value : null,
+            PropertyType = request.PropertyType.HasValue ? (DalEnums.PropertyType?)request.PropertyType.Value : null,
+            MinPrice = request.MinPrice,
+            MaxPrice = request.MaxPrice,
+            MinArea = request.MinArea,
+            MaxArea = request.MaxArea,
+            MinRooms = request.MinRooms,
+            MaxRooms = request.MaxRooms,
+            IsNewBuilding = request.IsNewBuilding,
+            HasMortgage = request.HasMortgage,
+            IsMortgageEligible = request.IsMortgageEligible,
+            IsFurnished = request.IsFurnished,
+            RepairStatus = request.RepairStatus.HasValue ? (DalEnums.RepairStatus?)request.RepairStatus.Value : null,
+            DocumentStatus = request.DocumentStatus.HasValue ? (DalEnums.DocumentStatus?)request.DocumentStatus.Value : null,
+            IsFeatured = request.IsFeatured,
+            Status = DalEnums.ListingStatus.Approved,
+            AdStatus = request.AdStatus.HasValue ? (DalEnums.AdStatus?)request.AdStatus.Value : null,
+            PublishedFrom = request.PublishedFrom,
+            PublishedTo = request.PublishedTo,
+            OnlyWithImages = request.OnlyWithImages,
+            IncludeDeleted = false,
+            SortBy = request.SortBy,
+            Descending = request.Descending,
+            Page = 1,
+            PageSize = 500
+        };
+
+        var result = await _listingRepository.SearchAsync(criteria, cancellationToken);
+        return result.Items
+            .Select(x =>
+            {
+                var hasCoordinates = _locationService.TryResolveCoordinates(x.City, x.District, out var latitude, out var longitude);
+                if (!hasCoordinates)
+                {
+                    return null;
+                }
+
+                return new ListingMapMarkerDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    Price = x.Price,
+                    CurrencyType = (int)x.CurrencyType,
+                    City = x.City,
+                    District = x.District,
+                    CoverImageUrl = x.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.SortOrder).Select(i => i.ImageUrl).FirstOrDefault(),
+                    Latitude = latitude,
+                    Longitude = longitude
+                };
+            })
+            .Where(x => x is not null)
+            .Cast<ListingMapMarkerDto>()
+            .ToList();
+    }
+
     public async Task<ListingDto?> GetByIdAsync(int id, string? languageCode, CancellationToken cancellationToken = default)
     {
         var listing = await _listingRepository.GetByIdAsync(id, cancellationToken);
@@ -107,6 +223,7 @@ public class ListingService : IListingService
     public async Task<ListingDto> CreateAsync(CreateListingRequest request, int ownerUserId, CancellationToken cancellationToken = default)
     {
         ValidateRequest(request.Title, request.Price, request.Area, request.Rooms, request.ContactPhone);
+        ValidateLocation(request.City, request.District);
 
         var listing = new Listing
         {
@@ -132,7 +249,9 @@ public class ListingService : IListingService
             DocumentStatus = (DalEnums.DocumentStatus)request.DocumentStatus,
             ContactName = request.ContactName.Trim(),
             ContactPhone = request.ContactPhone.Trim(),
-            Status = DalEnums.ListingStatus.Pending,
+            Status = DalEnums.ListingStatus.Approved,
+            AdStatus = DalEnums.AdStatus.Active,
+            PublishedAt = DateTime.UtcNow,
             Images = request.Images
                 .Where(x => !string.IsNullOrWhiteSpace(x.ImageUrl))
                 .Select(x => new ListingImage
@@ -152,6 +271,7 @@ public class ListingService : IListingService
     public async Task<bool> UpdateAsync(int id, UpdateListingRequest request, int ownerUserId, CancellationToken cancellationToken = default)
     {
         ValidateRequest(request.Title, request.Price, request.Area, request.Rooms, request.ContactPhone);
+        ValidateLocation(request.City, request.District);
 
         var existing = await _dbContext.Listings
             .AsNoTracking()
@@ -187,7 +307,9 @@ public class ListingService : IListingService
             DocumentStatus = (DalEnums.DocumentStatus)request.DocumentStatus,
             ContactName = request.ContactName.Trim(),
             ContactPhone = request.ContactPhone.Trim(),
-            Status = DalEnums.ListingStatus.Pending,
+            Status = DalEnums.ListingStatus.Approved,
+            AdStatus = DalEnums.AdStatus.Active,
+            PublishedAt = DateTime.UtcNow,
             ModerationNote = null,
             ModeratedAt = null,
             Images = request.Images
@@ -381,7 +503,7 @@ public class ListingService : IListingService
         return true;
     }
 
-    private static ListingDto MapToDto(Listing listing, string? languageCode)
+    private ListingDto MapToDto(Listing listing, string? languageCode)
     {
         var requestedLanguageCode = string.IsNullOrWhiteSpace(languageCode)
             ? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
@@ -402,6 +524,8 @@ public class ListingService : IListingService
             ?? normalizedTranslations.FirstOrDefault(x => x.LanguageCode == AppLanguageOptions.DefaultLanguage)?.Translation
             ?? listing.Translations.FirstOrDefault();
 
+        _ = _locationService.TryResolveCoordinates(listing.City, listing.District, out var latitude, out var longitude);
+
         return new ListingDto
         {
             Id = listing.Id,
@@ -417,6 +541,8 @@ public class ListingService : IListingService
             ListingType = (ListingType)listing.ListingType,
             City = listing.City,
             District = listing.District,
+            Latitude = latitude,
+            Longitude = longitude,
             Address = listing.Address,
             IsNewBuilding = listing.IsNewBuilding,
             HasMortgage = listing.HasMortgage,
@@ -504,6 +630,14 @@ public class ListingService : IListingService
         if (string.IsNullOrWhiteSpace(contactPhone))
         {
             throw new ArgumentException("Contact phone is required.");
+        }
+    }
+
+    private void ValidateLocation(string city, string district)
+    {
+        if (!_locationService.IsValidCityDistrict(city, district))
+        {
+            throw new ArgumentException("City and district must belong to supported Azerbaijan locations.");
         }
     }
 }

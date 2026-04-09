@@ -95,12 +95,16 @@
             </div>
             <div class="col-md-4">
                 <label asp-for="City" class="form-label"></label>
-                <input asp-for="City" class="form-control" />
+                <select asp-for="City" class="form-select" id="editCityInput" data-selected="@Model.City">
+                    <option value="">Şəhər seçin</option>
+                </select>
                 <span asp-validation-for="City" class="text-danger"></span>
             </div>
             <div class="col-md-4">
                 <label asp-for="District" class="form-label"></label>
-                <input asp-for="District" class="form-control" />
+                <select asp-for="District" class="form-select" id="editDistrictInput" data-selected="@Model.District">
+                    <option value="">Rayon seçin</option>
+                </select>
                 <span asp-validation-for="District" class="text-danger"></span>
             </div>
             <div class="col-md-4">
@@ -157,4 +161,61 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const cityInput = document.getElementById('editCityInput');
+            const districtInput = document.getElementById('editDistrictInput');
+            const locationCatalog = @Html.Raw(ViewData["AzerbaijanLocationsJson"] ?? "[]");
+
+            function fillCities() {
+                if (!cityInput) {
+                    return;
+                }
+
+                const selectedCity = cityInput.getAttribute('data-selected') || cityInput.value;
+                locationCatalog.forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city.name;
+                    option.textContent = city.name;
+                    if (selectedCity && selectedCity === city.name) {
+                        option.selected = true;
+                    }
+                    cityInput.appendChild(option);
+                });
+            }
+
+            function fillDistricts() {
+                if (!cityInput || !districtInput) {
+                    return;
+                }
+
+                const selectedDistrict = districtInput.getAttribute('data-selected') || districtInput.value;
+                const selectedCity = cityInput.value;
+                const city = locationCatalog.find(x => x.name === selectedCity);
+
+                districtInput.innerHTML = '<option value="">Rayon seçin</option>';
+                if (!city) {
+                    return;
+                }
+
+                (city.districts || []).forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    if (selectedDistrict && selectedDistrict === district) {
+                        option.selected = true;
+                    }
+                    districtInput.appendChild(option);
+                });
+            }
+
+            cityInput?.addEventListener('change', () => {
+                districtInput.dataset.selected = '';
+                fillDistricts();
+            });
+
+            fillCities();
+            fillDistricts();
+        })();
+    </script>
 }

@@ -30,11 +30,11 @@ public class CreateListingViewModel
     public int ListingType { get; set; } = 1;
 
     [Required]
-    [StringLength(80, MinimumLength = 2)]
+    [StringLength(80)]
     public string City { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(80, MinimumLength = 2)]
+    [StringLength(80)]
     public string District { get; set; } = string.Empty;
 
     [Required]

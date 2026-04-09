@@ -10,187 +10,365 @@
 </section>
 
 <section>
-        <form method="get" class="filter-panel mb-4">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <input name="Keyword" value="@Model.Filters.Keyword" class="form-control" placeholder="Açar söz" />
-                </div>
-                <div class="col-md-3">
-                    <input name="City" value="@Model.Filters.City" class="form-control" placeholder="Şəhər" />
-                </div>
-                <div class="col-md-3">
-                    <input name="District" value="@Model.Filters.District" class="form-control" placeholder="Rayon" />
-                </div>
-                <div class="col-md-3">
-                    <select name="ListingType" class="form-select">
-                        <option value="">Elan tipi</option>
-                        @if (Model.Filters.ListingType == 1)
+    <form method="get" class="filter-panel mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <input name="Keyword" value="@Model.Filters.Keyword" class="form-control" placeholder="Açar söz" />
+            </div>
+            <div class="col-md-2">
+                <select name="ListingType" class="form-select">
+                    @if (Model.Filters.ListingType is null)
+                    {
+                        <option value="" selected>Əməliyyat növü</option>
+                    }
+                    else
+                    {
+                        <option value="">Əməliyyat növü</option>
+                    }
+                    @if (Model.Filters.ListingType == 1)
+                    {
+                        <option value="1" selected>Alış</option>
+                    }
+                    else
+                    {
+                        <option value="1">Alış</option>
+                    }
+                    @if (Model.Filters.ListingType == 2)
+                    {
+                        <option value="2" selected>Kirayə</option>
+                    }
+                    else
+                    {
+                        <option value="2">Kirayə</option>
+                    }
+                    @if (Model.Filters.ListingType == 3)
+                    {
+                        <option value="3" selected>Günlük</option>
+                    }
+                    else
+                    {
+                        <option value="3">Günlük</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="PropertyType" class="form-select">
+                    @if (Model.Filters.PropertyType is null)
+                    {
+                        <option value="" selected>Əmlak növü</option>
+                    }
+                    else
+                    {
+                        <option value="">Əmlak növü</option>
+                    }
+                    @if (Model.Filters.PropertyType == 1)
+                    {
+                        <option value="1" selected>Mənzil</option>
+                    }
+                    else
+                    {
+                        <option value="1">Mənzil</option>
+                    }
+                    @if (Model.Filters.PropertyType == 2)
+                    {
+                        <option value="2" selected>Ev</option>
+                    }
+                    else
+                    {
+                        <option value="2">Ev</option>
+                    }
+                    @if (Model.Filters.PropertyType == 3)
+                    {
+                        <option value="3" selected>Villa</option>
+                    }
+                    else
+                    {
+                        <option value="3">Villa</option>
+                    }
+                    @if (Model.Filters.PropertyType == 4)
+                    {
+                        <option value="4" selected>Ofis</option>
+                    }
+                    else
+                    {
+                        <option value="4">Ofis</option>
+                    }
+                    @if (Model.Filters.PropertyType == 5)
+                    {
+                        <option value="5" selected>Torpaq</option>
+                    }
+                    else
+                    {
+                        <option value="5">Torpaq</option>
+                    }
+                    @if (Model.Filters.PropertyType == 6)
+                    {
+                        <option value="6" selected>Obyekt</option>
+                    }
+                    else
+                    {
+                        <option value="6">Obyekt</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="City" id="cityFilter" class="form-select">
+                    <option value="">Şəhər seçin</option>
+                    @foreach (var city in Model.AzerbaijanLocations)
+                    {
+                        if (string.Equals(Model.Filters.City, city.Name, StringComparison.OrdinalIgnoreCase))
                         {
-                            <option value="1" selected>Satıram</option>
+                            <option value="@city.Name" selected>@city.Name</option>
                         }
                         else
                         {
-                            <option value="1">Satıram</option>
+                            <option value="@city.Name">@city.Name</option>
                         }
-                        @if (Model.Filters.ListingType == 2)
-                        {
-                            <option value="2" selected>Kirayə verirəm</option>
-                        }
-                        else
-                        {
-                            <option value="2">Kirayə verirəm</option>
-                        }
-                        @if (Model.Filters.ListingType == 3)
-                        {
-                            <option value="3" selected>Günlük kirayə</option>
-                        }
-                        else
-                        {
-                            <option value="3">Günlük kirayə</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <input name="MinPrice" value="@Model.Filters.MinPrice" class="form-control" placeholder="Min qiymət" />
-                </div>
-                <div class="col-md-3">
-                    <input name="MaxPrice" value="@Model.Filters.MaxPrice" class="form-control" placeholder="Max qiymət" />
-                </div>
-                <div class="col-md-2">
-                    <input name="MinRooms" value="@Model.Filters.MinRooms" class="form-control" placeholder="Min otaq" />
-                </div>
-                <div class="col-md-2">
-                    <input name="MaxRooms" value="@Model.Filters.MaxRooms" class="form-control" placeholder="Max otaq" />
-                </div>
-                <div class="col-md-2">
-                    <select name="OnlyWithImages" class="form-select">
-                        <option value="">Şəkillər</option>
-                        @if (Model.Filters.OnlyWithImages == true)
-                        {
-                            <option value="true" selected>Yalnız şəkilli</option>
-                            <option value="false">Hamısı</option>
-                        }
-                        else if (Model.Filters.OnlyWithImages == false)
-                        {
-                            <option value="true">Yalnız şəkilli</option>
-                            <option value="false" selected>Hamısı</option>
-                        }
-                        else
-                        {
-                            <option value="true">Yalnız şəkilli</option>
-                            <option value="false">Hamısı</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select name="SortBy" class="form-select">
-                        @if (Model.Filters.SortBy == "published")
-                        {
-                            <option value="published" selected>Tarixə görə</option>
-                        }
-                        else
-                        {
-                            <option value="published">Tarixə görə</option>
-                        }
-                        @if (Model.Filters.SortBy == "price")
-                        {
-                            <option value="price" selected>Qiymətə görə</option>
-                        }
-                        else
-                        {
-                            <option value="price">Qiymətə görə</option>
-                        }
-                        @if (Model.Filters.SortBy == "area")
-                        {
-                            <option value="area" selected>Sahəyə görə</option>
-                        }
-                        else
-                        {
-                            <option value="area">Sahəyə görə</option>
-                        }
-                        @if (Model.Filters.SortBy == "rooms")
-                        {
-                            <option value="rooms" selected>Otağa görə</option>
-                        }
-                        else
-                        {
-                            <option value="rooms">Otağa görə</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select name="Descending" class="form-select">
-                        @if (Model.Filters.Descending)
-                        {
-                            <option value="true" selected>Azalan</option>
-                            <option value="false">Artan</option>
-                        }
-                        else
-                        {
-                            <option value="true">Azalan</option>
-                            <option value="false" selected>Artan</option>
-                        }
-                    </select>
-                </div>
-                <input type="hidden" name="PageSize" value="@Model.PageSize" />
-                <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-brand">Axtar</button>
-                    <a asp-action="Index" class="btn btn-outline-secondary">Sıfırla</a>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="District" id="districtFilter" class="form-select" data-selected="@Model.Filters.District">
+                    <option value="">Rayon seçin</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input name="MinPrice" value="@Model.Filters.MinPrice" class="form-control" placeholder="Min qiymət" />
+            </div>
+            <div class="col-md-3">
+                <input name="MaxPrice" value="@Model.Filters.MaxPrice" class="form-control" placeholder="Max qiymət" />
+            </div>
+            <div class="col-md-2">
+                <input name="MinArea" value="@Model.Filters.MinArea" class="form-control" placeholder="Min sahə" />
+            </div>
+            <div class="col-md-2">
+                <input name="MaxArea" value="@Model.Filters.MaxArea" class="form-control" placeholder="Max sahə" />
+            </div>
+            <div class="col-md-2">
+                <input name="MinRooms" value="@Model.Filters.MinRooms" class="form-control" placeholder="Min otaq" />
+            </div>
+            <div class="col-md-2">
+                <input name="MaxRooms" value="@Model.Filters.MaxRooms" class="form-control" placeholder="Max otaq" />
+            </div>
+            <div class="col-12">
+                <div class="d-flex flex-wrap gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="OnlyWithImages" value="true" id="onlyWithImages" @(Model.Filters.OnlyWithImages == true ? "checked" : null) />
+                        <label class="form-check-label" for="onlyWithImages">Yalnız şəkilli</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="IsNewBuilding" value="true" id="isNewBuilding" @(Model.Filters.IsNewBuilding == true ? "checked" : null) />
+                        <label class="form-check-label" for="isNewBuilding">Yeni tikili</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="IsFurnished" value="true" id="isFurnished" @(Model.Filters.IsFurnished == true ? "checked" : null) />
+                        <label class="form-check-label" for="isFurnished">Mebelli</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="HasMortgage" value="true" id="hasMortgage" @(Model.Filters.HasMortgage == true ? "checked" : null) />
+                        <label class="form-check-label" for="hasMortgage">İpotekalı</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="IsFeatured" value="true" id="isFeatured" @(Model.Filters.IsFeatured == true ? "checked" : null) />
+                        <label class="form-check-label" for="isFeatured">Premium</label>
+                    </div>
                 </div>
             </div>
-        </form>
+            <div class="col-md-2">
+                <select name="SortBy" class="form-select">
+                    @if (Model.Filters.SortBy == "published")
+                    {
+                        <option value="published" selected>Tarixə görə</option>
+                    }
+                    else
+                    {
+                        <option value="published">Tarixə görə</option>
+                    }
+                    @if (Model.Filters.SortBy == "price")
+                    {
+                        <option value="price" selected>Qiymətə görə</option>
+                    }
+                    else
+                    {
+                        <option value="price">Qiymətə görə</option>
+                    }
+                    @if (Model.Filters.SortBy == "area")
+                    {
+                        <option value="area" selected>Sahəyə görə</option>
+                    }
+                    else
+                    {
+                        <option value="area">Sahəyə görə</option>
+                    }
+                    @if (Model.Filters.SortBy == "rooms")
+                    {
+                        <option value="rooms" selected>Otağa görə</option>
+                    }
+                    else
+                    {
+                        <option value="rooms">Otağa görə</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="Descending" class="form-select">
+                    @if (Model.Filters.Descending)
+                    {
+                        <option value="true" selected>Azalan</option>
+                        <option value="false">Artan</option>
+                    }
+                    else
+                    {
+                        <option value="true">Azalan</option>
+                        <option value="false" selected>Artan</option>
+                    }
+                </select>
+            </div>
+            <input type="hidden" name="PageSize" value="@Model.PageSize" />
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-brand">Axtar</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Sıfırla</a>
+            </div>
+        </div>
+    </form>
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <p class="mb-0 text-muted">Tapıldı: <strong>@Model.TotalCount</strong> elan</p>
+    <div class="list-map-layout">
+        <div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <p class="mb-0 text-muted">Tapıldı: <strong>@Model.TotalCount</strong> elan</p>
+            </div>
+
+            @if (Model.Items.Count == 0)
+            {
+                <div class="empty-state">
+                    <h3 class="h5 mb-2">Elan tapılmadı</h3>
+                    <p class="text-muted mb-0">Hazırda göstəriləcək elan yoxdur.</p>
+                </div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var item in Model.Items)
+                    {
+                        <div class="col-12">
+                            <partial name="_ListingCard" model="item" />
+                        </div>
+                    }
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav class="mt-4" aria-label="Pagination">
+                        <ul class="pagination pagination-modern mb-0">
+                            @for (var p = 1; p <= Model.TotalPages; p++)
+                            {
+                                var pageUrl = Url.Action("Index", new
+                                {
+                                    page = p,
+                                    pageSize = Model.PageSize,
+                                    keyword = Model.Filters.Keyword,
+                                    city = Model.Filters.City,
+                                    district = Model.Filters.District,
+                                    listingType = Model.Filters.ListingType,
+                                    propertyType = Model.Filters.PropertyType,
+                                    minPrice = Model.Filters.MinPrice,
+                                    maxPrice = Model.Filters.MaxPrice,
+                                    minArea = Model.Filters.MinArea,
+                                    maxArea = Model.Filters.MaxArea,
+                                    minRooms = Model.Filters.MinRooms,
+                                    maxRooms = Model.Filters.MaxRooms,
+                                    isNewBuilding = Model.Filters.IsNewBuilding,
+                                    hasMortgage = Model.Filters.HasMortgage,
+                                    isMortgageEligible = Model.Filters.IsMortgageEligible,
+                                    isFurnished = Model.Filters.IsFurnished,
+                                    repairStatus = Model.Filters.RepairStatus,
+                                    documentStatus = Model.Filters.DocumentStatus,
+                                    isFeatured = Model.Filters.IsFeatured,
+                                    adStatus = Model.Filters.AdStatus,
+                                    onlyWithImages = Model.Filters.OnlyWithImages,
+                                    sortBy = Model.Filters.SortBy,
+                                    descending = Model.Filters.Descending
+                                });
+
+                                <li class="page-item @(p == Model.Page ? "active" : string.Empty)">
+                                    <a class="page-link" href="@pageUrl">@p</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            }
         </div>
 
-        @if (Model.Items.Count == 0)
-        {
-            <div class="empty-state">
-                <h3 class="h5 mb-2">Elan tapılmadı</h3>
-                <p class="text-muted mb-0">Hazırda göstəriləcək elan yoxdur.</p>
-            </div>
-        }
-        else
-        {
-            <div class="row g-4">
-                @foreach (var item in Model.Items)
-                {
-                    <div class="col-12 col-md-6">
-                        <partial name="_ListingCard" model="item" />
-                    </div>
-                }
-            </div>
-
-            @if (Model.TotalPages > 1)
-            {
-                <nav class="mt-4" aria-label="Pagination">
-                    <ul class="pagination pagination-modern mb-0">
-                        @for (var p = 1; p <= Model.TotalPages; p++)
-                        {
-                            var pageUrl = Url.Action("Index", new
-                            {
-                                page = p,
-                                pageSize = Model.PageSize,
-                                keyword = Model.Filters.Keyword,
-                                city = Model.Filters.City,
-                                district = Model.Filters.District,
-                                listingType = Model.Filters.ListingType,
-                                minPrice = Model.Filters.MinPrice,
-                                maxPrice = Model.Filters.MaxPrice,
-                                minRooms = Model.Filters.MinRooms,
-                                maxRooms = Model.Filters.MaxRooms,
-                                onlyWithImages = Model.Filters.OnlyWithImages,
-                                sortBy = Model.Filters.SortBy,
-                                descending = Model.Filters.Descending
-                            });
-
-                            <li class="page-item @(p == Model.Page ? "active" : string.Empty)">
-                                <a class="page-link" href="@pageUrl">@p</a>
-                            </li>
-                        }
-                    </ul>
-                </nav>
-            }
-        }
+        <div>
+            <div id="listingsMap" class="listings-map"></div>
+        </div>
+    </div>
 </section>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        (() => {
+            const cityFilter = document.getElementById('cityFilter');
+            const districtFilter = document.getElementById('districtFilter');
+            const locations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AzerbaijanLocations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+            const markers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MapMarkers, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+            function fillDistricts() {
+                const selectedCity = cityFilter?.value || '';
+                const selectedDistrict = districtFilter?.dataset.selected || '';
+                const city = locations.find(x => x.name === selectedCity);
+
+                districtFilter.innerHTML = '<option value="">Rayon seçin</option>';
+                if (!city) {
+                    return;
+                }
+
+                city.districts.forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    if (selectedDistrict && selectedDistrict === district) {
+                        option.selected = true;
+                    }
+                    districtFilter.appendChild(option);
+                });
+            }
+
+            cityFilter?.addEventListener('change', () => {
+                districtFilter.dataset.selected = '';
+                fillDistricts();
+            });
+            fillDistricts();
+
+            const mapContainer = document.getElementById('listingsMap');
+            if (!mapContainer || typeof L === 'undefined') {
+                return;
+            }
+
+            const map = L.map('listingsMap').setView([40.409264, 49.867092], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            if (!markers || markers.length === 0) {
+                return;
+            }
+
+            const bounds = [];
+            markers.forEach(marker => {
+                const point = [marker.latitude, marker.longitude];
+                bounds.push(point);
+                const popup = `<strong>${marker.title}</strong><br/>${marker.price.toLocaleString()} ${marker.currency}<br/><a href="${marker.detailsUrl}">Ətraflı bax</a>`;
+                L.marker(point).addTo(map).bindPopup(popup);
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [30, 30] });
+            }
+        })();
+    </script>
+}

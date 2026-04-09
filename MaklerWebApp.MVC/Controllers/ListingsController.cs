@@ -3,6 +3,8 @@ using MaklerWebApp.MVC.Services.Api;
 using MaklerWebApp.MVC.Services.Api.Contracts;
 using MaklerWebApp.MVC.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaklerWebApp.MVC.Controllers;
@@ -57,6 +59,34 @@ public class ListingsController : Controller
             Descending = filters.Descending
         }, cancellationToken);
 
+        var mapMarkers = await _maklerApiClient.SearchMapListingsAsync(new ApiListingSearchRequest
+        {
+            Keyword = filters.Keyword,
+            City = filters.City,
+            District = filters.District,
+            ListingType = filters.ListingType,
+            PropertyType = filters.PropertyType,
+            MinPrice = filters.MinPrice,
+            MaxPrice = filters.MaxPrice,
+            MinArea = filters.MinArea,
+            MaxArea = filters.MaxArea,
+            MinRooms = filters.MinRooms,
+            MaxRooms = filters.MaxRooms,
+            IsNewBuilding = filters.IsNewBuilding,
+            HasMortgage = filters.HasMortgage,
+            IsMortgageEligible = filters.IsMortgageEligible,
+            IsFurnished = filters.IsFurnished,
+            RepairStatus = filters.RepairStatus,
+            DocumentStatus = filters.DocumentStatus,
+            IsFeatured = filters.IsFeatured,
+            AdStatus = filters.AdStatus,
+            OnlyWithImages = filters.OnlyWithImages,
+            SortBy = string.IsNullOrWhiteSpace(filters.SortBy) ? "published" : filters.SortBy,
+            Descending = filters.Descending
+        }, cancellationToken);
+
+        var locations = await _maklerApiClient.GetAzerbaijanLocationsAsync(cancellationToken);
+
         var cards = apiResult.Items.Select(x => new ListingCardViewModel
         {
             Id = x.Id,
@@ -104,6 +134,23 @@ public class ListingsController : Controller
                 Descending = filters.Descending
             },
             Items = cards,
+            MapMarkers = mapMarkers.Select(x => new MapListingMarkerViewModel
+            {
+                Id = x.Id,
+                Title = x.Title,
+                Price = x.Price,
+                Currency = GetCurrencyCode(x.CurrencyType),
+                Location = string.IsNullOrWhiteSpace(x.District) ? x.City : $"{x.City}, {x.District}",
+                CoverImageUrl = x.CoverImageUrl,
+                Latitude = x.Latitude,
+                Longitude = x.Longitude,
+                DetailsUrl = Url.Action(nameof(Details), new { id = x.Id }) ?? "#"
+            }).ToList(),
+            AzerbaijanLocations = locations.Select(x => new AzerbaijanLocationViewModel
+            {
+                Name = x.Name,
+                Districts = x.Districts.Select(d => d.Name).ToList()
+            }).ToList(),
             TotalCount = apiResult.TotalCount,
             Page = apiResult.Page,
             PageSize = apiResult.PageSize
@@ -121,6 +168,8 @@ public class ListingsController : Controller
         {
             return NotFound();
         }
+
+        await PopulateLocationViewDataAsync(cancellationToken);
 
         var model = new CreateListingViewModel
         {
@@ -150,11 +199,12 @@ public class ListingsController : Controller
     {
         if (!ModelState.IsValid)
         {
+            await PopulateLocationViewDataAsync(cancellationToken);
             ViewData["ListingId"] = id;
             return View(model);
         }
 
-        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
             return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(Edit), new { id }) });
@@ -211,6 +261,7 @@ public class ListingsController : Controller
             if (!updated)
             {
                 ModelState.AddModelError(string.Empty, "Elan yenilənmədi. Yenidən cəhd edin.");
+                await PopulateLocationViewDataAsync(cancellationToken);
                 ViewData["ListingId"] = id;
                 return View(model);
             }
@@ -302,8 +353,9 @@ public class ListingsController : Controller
 
     [HttpGet]
     [Authorize]
-    public IActionResult Create()
+    public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
+        await PopulateLocationViewDataAsync(cancellationToken);
         return View(new CreateListingViewModel());
     }
 
@@ -317,7 +369,7 @@ public class ListingsController : Controller
             return BadRequest(new { message = "Ən azı bir şəkil seçin." });
         }
 
-        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
             return Unauthorized(new { message = "Sessiya bitib. Yenidən daxil olun." });
@@ -346,10 +398,11 @@ public class ListingsController : Controller
     {
         if (!ModelState.IsValid)
         {
+            await PopulateLocationViewDataAsync(cancellationToken);
             return View(model);
         }
 
-        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        var accessToken = await GetValidAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
             return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(Create)) });
@@ -406,6 +459,7 @@ public class ListingsController : Controller
             if (created is null)
             {
                 ModelState.AddModelError(string.Empty, "Elan yaradılmadı. Məlumatları yoxlayıb yenidən cəhd edin.");
+                await PopulateLocationViewDataAsync(cancellationToken);
                 return View(model);
             }
 
@@ -426,5 +480,59 @@ public class ListingsController : Controller
             3 => "EUR",
             _ => "AZN"
         };
+    }
+
+    private async Task PopulateLocationViewDataAsync(CancellationToken cancellationToken)
+    {
+        var locations = await _maklerApiClient.GetAzerbaijanLocationsAsync(cancellationToken);
+        ViewData["AzerbaijanLocationsJson"] = System.Text.Json.JsonSerializer.Serialize(
+            locations.Select(x => new
+            {
+                name = x.Name,
+                districts = x.Districts.Select(d => d.Name)
+            }));
+    }
+
+    private async Task<string?> GetValidAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        var accessToken = HttpContext.Session.GetString(AuthSessionKeys.AccessToken);
+        if (!string.IsNullOrWhiteSpace(accessToken))
+        {
+            return accessToken;
+        }
+
+        var authResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        var storedAccessToken = authResult?.Properties?.GetTokenValue("access_token");
+        if (!string.IsNullOrWhiteSpace(storedAccessToken))
+        {
+            HttpContext.Session.SetString(AuthSessionKeys.AccessToken, storedAccessToken);
+            return storedAccessToken;
+        }
+
+        var refreshToken = HttpContext.Session.GetString(AuthSessionKeys.RefreshToken)
+            ?? authResult?.Properties?.GetTokenValue("refresh_token");
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return null;
+        }
+
+        var refreshed = await _maklerApiClient.RefreshAsync(refreshToken, cancellationToken);
+        if (refreshed is null)
+        {
+            return null;
+        }
+
+        if (authResult?.Principal is not null)
+        {
+            var properties = authResult.Properties ?? new AuthenticationProperties();
+            properties.UpdateTokenValue("access_token", refreshed.AccessToken);
+            properties.UpdateTokenValue("refresh_token", refreshed.RefreshToken);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, authResult.Principal, properties);
+        }
+
+        HttpContext.Session.SetString(AuthSessionKeys.AccessToken, refreshed.AccessToken);
+        HttpContext.Session.SetString(AuthSessionKeys.RefreshToken, refreshed.RefreshToken);
+
+        return refreshed.AccessToken;
     }
 }

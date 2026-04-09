@@ -13,6 +13,10 @@
         {
             <div class="alert alert-success">@successMessage</div>
         }
+        @if (TempData["ErrorMessage"] is string errorMessage)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
 
         <form asp-action="VerifyOtp" method="post" novalidate>
             @Html.AntiForgeryToken()
@@ -31,6 +35,12 @@
             </div>
 
             <button type="submit" class="btn btn-brand w-100">Təsdiqlə</button>
+        </form>
+
+        <form asp-action="ResendOtp" method="post" class="mt-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="emailOrPhone" value="@Model.EmailOrPhone" />
+            <button type="submit" class="btn btn-outline-secondary w-100">Kodu yenidən göndər</button>
         </form>
     </div>
 </section>
